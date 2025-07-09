@@ -2,26 +2,37 @@
   "rules": {
     "events": {
       ".read": true,
-      ".write": "auth != null && (auth.token.email == 'chagai33@gmail.com' || root.child('admins').child(auth.uid).val() == true)"
+      // רק מנהלים יכולים לכתוב לאירועים
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
     },
     "menuItems": {
       ".read": true,
-      ".write": true
+      ".write": true // כלל פתוח, ניתן להגביל למנהלים אם רוצים
     },
     "assignments": {
       ".read": true,
-      ".write": true
+      ".write": true // כלל פתוח, מאפשר לכל משתמש ליצור שיבוץ
     },
-    "admins": {
-      ".read": "auth != null",
-      ".write": "auth != null && (auth.token.email == 'chagai33@gmail.com' || root.child('admins').child(auth.uid).val() == true)",
-      "$uid": {
-        ".write": "auth != null && auth.uid == $uid"
-      }
+      "admins": {
+  ".read": "auth != null",
+  // רק מנהלים קיימים יכולים להוסיף, לערוך או למחוק מנהלים אחרים
+  ".write": "auth != null && root.child('admins').child(auth.uid).exists()",
+  "$uid": {
+    // כל מנהל יכול לערוך את הפרטים של עצמו
+    ".write": "auth != null && auth.uid == $uid",
+
+    // חוק אימות למניעת מחיקת מנהל-העל
+    // החוק מוודא שהכתיבה תקינה אם:
+    // 1. המידע החדש קיים (כלומר, זו פעולת עדכון ולא מחיקה)
+    // או
+    // 2. כתובת המייל של הרשומה הנמחקת אינה של מנהל-העל
+    ".validate": "newData.exists() || data.child('email').val() !== 'chagai33@gmail.com'"
+  }
     },
     "presetLists": {
       ".read": true,
-      ".write": true
+      // רק מנהלים יכולים לנהל רשימות מוכנות
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
     }
   }
 }

@@ -17,7 +17,7 @@ interface FormErrors {
 }
 
 export function MenuItemForm({ event, item, onClose }: MenuItemFormProps) {
-  const { addMenuItem, updateMenuItem } = useStore();
+  const { menuItems, addMenuItem, updateMenuItem } = useStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   
@@ -67,6 +67,22 @@ export function MenuItemForm({ event, item, onClose }: MenuItemFormProps) {
     setIsSubmitting(true);
 
     try {
+      // --- בדיקת כפילויות ---
+      if (!item) { // בצע בדיקה רק בעת יצירת פריט חדש
+        const eventMenuItems = menuItems.filter(mi => mi.eventId === event.id);
+        const isDuplicate = eventMenuItems.some(
+          mi => mi.name.trim().toLowerCase() === formData.name.trim().toLowerCase()
+        );
+
+        if (isDuplicate) {
+          if (!confirm(`פריט בשם "${formData.name.trim()}" כבר קיים באירוע. האם להוסיף אותו בכל זאת?`)) {
+            setIsSubmitting(false);
+            return; // המשתמש בחר לא להוסיף, הפסק את הפעולה
+          }
+        }
+      }
+      // --- סוף בדיקת כפילויות ---
+
       const itemData = {
         ...formData,
         name: formData.name.trim(),
