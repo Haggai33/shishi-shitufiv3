@@ -34,6 +34,8 @@ export interface MenuItem {
   notes?: string;
   isRequired: boolean;
   createdAt: number;
+  creatorId?: string;      // שדה חדש: מזהה המשתמש שיצר את הפריט
+  creatorName?: string;  // שדה חדש: שם המשתמש שיצר את הפריט
 }
 
 export interface Assignment {

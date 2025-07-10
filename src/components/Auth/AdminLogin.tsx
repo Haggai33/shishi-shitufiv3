@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { X, Lock, User, Eye, EyeOff, AlertCircle, Info, UserPlus } from 'lucide-react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, updateProfile } from 'firebase/auth'; // הוספת updateProfile
 import { auth } from '../../lib/firebase';
 import { FirebaseService } from '../../services/firebaseService';
+import { useStore } from '../../store/useStore'; // שינוי
 import toast from 'react-hot-toast';
 
 interface AdminLoginProps {
@@ -17,6 +18,7 @@ interface FormErrors {
 }
 
 export function AdminLogin({ onClose, onSuccess }: AdminLoginProps) {
+  const { setIsAdmin } = useStore(); // שימוש ישיר ב-setIsAdmin מה-store
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -28,81 +30,52 @@ export function AdminLogin({ onClose, onSuccess }: AdminLoginProps) {
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
-
-    if (!email.trim()) {
-      newErrors.email = 'אימייל הוא שדה חובה';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       newErrors.email = 'כתובת אימייל לא תקינה';
     }
-
-    if (!password.trim()) {
-      newErrors.password = 'סיסמה היא שדה חובה';
-    } else if (password.length < 6) {
+    if (!password.trim() || password.length < 6) {
       newErrors.password = 'הסיסמה חייבת להכיל לפחות 6 תווים';
     }
-
     if (showAdminSetup && !displayName.trim()) {
       newErrors.displayName = 'שם הוא שדה חובה';
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!validateForm()) {
       toast.error('יש לתקן את השגיאות בטופס');
       return;
     }
-
     setIsLoading(true);
-
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const isAdminCheck = await FirebaseService.checkAdminStatus(userCredential.user.uid);
       
-      // Check if user is already an admin
-      const isAdmin = await FirebaseService.checkAdminStatus(userCredential.user.uid);
-      
-      if (!isAdmin) {
-        // User exists in Auth but not in admins table - show setup option
+      if (!isAdminCheck) {
         setShowAdminSetup(true);
         setIsLoading(false);
         return;
       }
       
+      setIsAdmin(true);
       toast.success('התחברת בהצלחה כמנהל!');
       onSuccess();
       onClose();
     } catch (error: any) {
       console.error('Admin login error:', error);
-      
-      let errorMessage = 'שגיאה בהתחברות';
-      let showSetup = false;
-      
-      if (error.code === 'auth/user-not-found') {
-        errorMessage = 'משתמש לא נמצא - יש ליצור חשבון מנהל תחילה';
-        showSetup = true;
+      let errorMessage = 'פרטי התחברות שגויים';
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+        errorMessage = 'פרטי התחברות שגויים או חשבון מנהל לא קיים';
+        setShowSetupInfo(true);
       } else if (error.code === 'auth/wrong-password') {
         errorMessage = 'סיסמה שגויה';
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'כתובת אימייל לא תקינה';
       } else if (error.code === 'auth/too-many-requests') {
         errorMessage = 'יותר מדי ניסיונות התחברות. נסה שוב מאוחר יותר';
-      } else if (error.code === 'auth/invalid-credential') {
-        errorMessage = 'פרטי התחברות שגויים או חשבון מנהל לא קיים';
-        showSetup = true;
-      } else if (error.code === 'auth/operation-not-allowed') {
-        errorMessage = 'התחברות באימייל וסיסמה לא מופעלת ב-Firebase';
-        showSetup = true;
       }
-      
       toast.error(errorMessage);
-      
-      if (showSetup) {
-        setShowSetupInfo(true);
-      }
     } finally {
       setIsLoading(false);
     }
@@ -113,11 +86,18 @@ export function AdminLogin({ onClose, onSuccess }: AdminLoginProps) {
       toast.error('יש להזין שם');
       return;
     }
-
+    if (!auth.currentUser) {
+        toast.error('שגיאה: לא זוהה משתמש מחובר');
+        return;
+    }
     setIsLoading(true);
-
     try {
+      // עדכון הפרופיל ב-Firebase Auth עצמו
+      await updateProfile(auth.currentUser, { displayName: displayName.trim() });
+      // הוספת המשתמש לטבלת המנהלים במסד הנתונים
       await FirebaseService.addCurrentUserAsAdmin(displayName.trim());
+      
+      setIsAdmin(true);
       toast.success('נוספת בהצלחה כמנהל!');
       onSuccess();
       onClose();
@@ -130,15 +110,10 @@ export function AdminLogin({ onClose, onSuccess }: AdminLoginProps) {
   };
 
   const handleInputChange = (field: string, value: string) => {
-    if (field === 'email') {
-      setEmail(value);
-    } else if (field === 'password') {
-      setPassword(value);
-    } else if (field === 'displayName') {
-      setDisplayName(value);
-    }
+    if (field === 'email') setEmail(value);
+    else if (field === 'password') setPassword(value);
+    else if (field === 'displayName') setDisplayName(value);
     
-    // Clear error when user starts typing
     if (errors[field as keyof FormErrors]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
     }
@@ -147,97 +122,40 @@ export function AdminLogin({ onClose, onSuccess }: AdminLoginProps) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <div className="flex items-center space-x-3 rtl:space-x-reverse">
-            <div className="bg-blue-100 rounded-lg p-2">
-              <Lock className="h-5 w-5 text-blue-600" />
-            </div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              {showAdminSetup ? 'הגדרת מנהל' : 'התחברות מנהל'}
-            </h2>
+            <div className="bg-blue-100 rounded-lg p-2"><Lock className="h-5 w-5 text-blue-600" /></div>
+            <h2 className="text-lg font-semibold text-gray-900">{showAdminSetup ? 'הגדרת מנהל' : 'התחברות מנהל'}</h2>
           </div>
-          <button
-            onClick={onClose}
-            disabled={isLoading}
-            className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <button onClick={onClose} disabled={isLoading} className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"><X className="h-5 w-5" /></button>
         </div>
 
-        {/* Admin Setup Mode */}
-        {showAdminSetup && (
+        {showAdminSetup ? (
           <div className="p-6">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
               <div className="flex items-start">
                 <UserPlus className="h-5 w-5 text-blue-600 mt-0.5 ml-2 flex-shrink-0" />
                 <div className="text-sm">
                   <h3 className="font-medium text-blue-800 mb-2">הגדרת הרשאות מנהל</h3>
-                  <p className="text-blue-700">
-                    התחברת בהצלחה, אך עדיין לא הוגדרת כמנהל במערכת. 
-                    הזן שם להצגה כדי להשלים את ההגדרה.
-                  </p>
+                  <p className="text-blue-700">התחברת בהצלחה, אך עדיין לא הוגדרת כמנהל במערכת. הזן שם להצגה כדי להשלים את ההגדרה.</p>
                 </div>
               </div>
             </div>
-
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                שם להצגה *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">שם להצגה *</label>
               <div className="relative">
                 <User className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => handleInputChange('displayName', e.target.value)}
-                  placeholder="שם המנהל"
-                  className={`w-full pr-10 pl-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.displayName ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  disabled={isLoading}
-                  required
-                />
+                <input type="text" value={displayName} onChange={(e) => handleInputChange('displayName', e.target.value)} placeholder="שם המנהל" className={`w-full pr-10 pl-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.displayName ? 'border-red-500' : 'border-gray-300'}`} disabled={isLoading} required />
               </div>
-              {errors.displayName && (
-                <p className="mt-1 text-sm text-red-600 flex items-center">
-                  <AlertCircle className="h-4 w-4 ml-1" />
-                  {errors.displayName}
-                </p>
-              )}
+              {errors.displayName && (<p className="mt-1 text-sm text-red-600 flex items-center"><AlertCircle className="h-4 w-4 ml-1" />{errors.displayName}</p>)}
             </div>
-
             <div className="flex space-x-3 rtl:space-x-reverse">
-              <button
-                onClick={handleSetupAdmin}
-                disabled={isLoading || !displayName.trim()}
-                className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center"
-              >
-                {isLoading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white ml-2"></div>
-                    מגדיר...
-                  </>
-                ) : (
-                  'הגדר כמנהל'
-                )}
-              </button>
-              <button
-                onClick={() => setShowAdminSetup(false)}
-                disabled={isLoading}
-                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-medium transition-colors disabled:opacity-50"
-              >
-                חזור
-              </button>
+              <button onClick={handleSetupAdmin} disabled={isLoading || !displayName.trim()} className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center">{isLoading ? (<><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white ml-2"></div>מגדיר...</>) : ('הגדר כמנהל')}</button>
+              <button onClick={() => setShowAdminSetup(false)} disabled={isLoading} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-medium transition-colors disabled:opacity-50">חזור</button>
             </div>
           </div>
-        )}
-
-        {/* Login Mode */}
-        {!showAdminSetup && (
+        ) : (
           <>
-            {/* Setup Info Alert */}
             {showSetupInfo && (
               <div className="mx-6 mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
                 <div className="flex items-start">
@@ -253,115 +171,35 @@ export function AdminLogin({ onClose, onSuccess }: AdminLoginProps) {
                         <li>עבור ל-Authentication → Users</li>
                         <li>לחץ "Add user" וצור חשבון מנהל</li>
                       </ol>
-                      <p className="text-xs mt-2">
-                        לאחר יצירת החשבון, תוכל להתחבר עם הפרטים שיצרת.
-                      </p>
+                      <p className="text-xs mt-2">לאחר יצירת החשבון, תוכל להתחבר עם הפרטים שיצרת.</p>
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => setShowSetupInfo(false)}
-                  className="mt-3 text-amber-600 hover:text-amber-800 text-sm font-medium"
-                >
-                  הבנתי
-                </button>
+                <button onClick={() => setShowSetupInfo(false)} className="mt-3 text-amber-600 hover:text-amber-800 text-sm font-medium">הבנתי</button>
               </div>
             )}
-
-            {/* Form */}
             <form onSubmit={handleLogin} className="p-6">
-              <div className="mb-6">
-                <p className="text-gray-600 text-sm">
-                  התחבר עם פרטי המנהל כדי לנהל אירועים ופריטי תפריט
-                </p>
-              </div>
-
-              {/* Email */}
+              <div className="mb-6"><p className="text-gray-600 text-sm">התחבר עם פרטי המנהל כדי לנהל אירועים ופריטי תפריט</p></div>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  אימייל *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">אימייל *</label>
                 <div className="relative">
                   <User className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    placeholder="admin@example.com"
-                    className={`w-full pr-10 pl-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.email ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    disabled={isLoading}
-                    required
-                  />
+                  <input type="email" value={email} onChange={(e) => handleInputChange('email', e.target.value)} placeholder="admin@example.com" className={`w-full pr-10 pl-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.email ? 'border-red-500' : 'border-gray-300'}`} disabled={isLoading} required />
                 </div>
-                {errors.email && (
-                  <p className="mt-1 text-sm text-red-600 flex items-center">
-                    <AlertCircle className="h-4 w-4 ml-1" />
-                    {errors.email}
-                  </p>
-                )}
+                {errors.email && (<p className="mt-1 text-sm text-red-600 flex items-center"><AlertCircle className="h-4 w-4 ml-1" />{errors.email}</p>)}
               </div>
-
-              {/* Password */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  סיסמה *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">סיסמה *</label>
                 <div className="relative">
                   <Lock className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => handleInputChange('password', e.target.value)}
-                    placeholder="הזן סיסמה"
-                    className={`w-full pr-10 pl-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.password ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    disabled={isLoading}
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    disabled={isLoading}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
+                  <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => handleInputChange('password', e.target.value)} placeholder="הזן סיסמה" className={`w-full pr-10 pl-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.password ? 'border-red-500' : 'border-gray-300'}`} disabled={isLoading} required />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600" disabled={isLoading}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
                 </div>
-                {errors.password && (
-                  <p className="mt-1 text-sm text-red-600 flex items-center">
-                    <AlertCircle className="h-4 w-4 ml-1" />
-                    {errors.password}
-                  </p>
-                )}
+                {errors.password && (<p className="mt-1 text-sm text-red-600 flex items-center"><AlertCircle className="h-4 w-4 ml-1" />{errors.password}</p>)}
               </div>
-
-              {/* Actions */}
               <div className="flex space-x-3 rtl:space-x-reverse">
-                <button
-                  type="submit"
-                  disabled={isLoading || !email.trim() || !password.trim()}
-                  className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center"
-                >
-                  {isLoading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white ml-2"></div>
-                      מתחבר...
-                    </>
-                  ) : (
-                    'התחבר'
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  disabled={isLoading}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-medium transition-colors disabled:opacity-50"
-                >
-                  ביטול
-                </button>
+                <button type="submit" disabled={isLoading || !email.trim() || !password.trim()} className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center">{isLoading ? (<><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white ml-2"></div>מתחבר...</>) : ('התחבר')}</button>
+                <button type="button" onClick={onClose} disabled={isLoading} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-medium transition-colors disabled:opacity-50">ביטול</button>
               </div>
             </form>
           </>

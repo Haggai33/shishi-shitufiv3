@@ -1,40 +1,30 @@
 import { useState, useEffect } from 'react';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { auth } from '../lib/firebase';
-import { FirebaseService } from '../services/firebaseService';
+import { useStore } from '../store/useStore';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { setIsAdmin } = useStore(); // שימוש ב-setIsAdmin מה-store
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user);
-      
-      if (user) {
-        // Check if user is admin
-        try {
-          const adminStatus = await FirebaseService.checkAdminStatus(user.uid);
-          setIsAdmin(adminStatus);
-        } catch (error) {
-          console.error('Error checking admin status:', error);
-          setIsAdmin(false);
-        }
-      } else {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
+      // אם המשתמש התנתק, נאפס את סטטוס המנהל ב-store
+      if (!firebaseUser) {
         setIsAdmin(false);
       }
-      
       setIsLoading(false);
     });
 
     return unsubscribe;
-  }, []);
+  }, [setIsAdmin]);
 
   const logout = async () => {
     try {
       await signOut(auth);
-      setIsAdmin(false);
+      // onAuthStateChanged יטפל באיפוס המצב אוטומטית
     } catch (error) {
       console.error('Error signing out:', error);
     }
@@ -42,8 +32,7 @@ export function useAuth() {
 
   return {
     user,
-    isAdmin,
     isLoading,
-    logout
+    logout,
   };
 }

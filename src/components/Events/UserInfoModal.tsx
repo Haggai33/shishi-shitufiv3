@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, User, Phone, Mail, AlertCircle } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import { updateUserInLocalStorage } from '../../utils/userUtils';
+import { saveUserToLocalStorage, updateUserInLocalStorage } from '../../utils/userUtils';
 import toast from 'react-hot-toast';
 
 interface UserInfoModalProps {
@@ -60,7 +60,7 @@ export function UserInfoModal({ onClose, onComplete }: UserInfoModalProps) {
         email: email.trim() || undefined
       };
 
-      updateUserInLocalStorage(updatedUser);
+      saveUserToLocalStorage(updatedUser);
       setUser(updatedUser);
       
       toast.success('הפרטים נשמרו בהצלחה!');

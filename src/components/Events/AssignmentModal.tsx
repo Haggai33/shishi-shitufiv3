@@ -3,7 +3,7 @@ import { X, User, Phone, MessageSquare, AlertCircle } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { FirebaseService } from '../../services/firebaseService';
 import { MenuItem, ShishiEvent, Assignment } from '../../types';
-import { updateUserInLocalStorage } from '../../utils/userUtils';
+import { saveUserToLocalStorage, updateUserInLocalStorage } from '../../utils/userUtils';
 import toast from 'react-hot-toast';
 
 interface AssignmentModalProps {
@@ -69,14 +69,13 @@ export function AssignmentModal({ menuItem, event, onClose }: AssignmentModalPro
     try {
       let finalUserName = user.name;
 
-      // If user doesn't have a name yet, save it
       if (!hasUserName) {
         const updatedUser = {
           ...user,
           name: name.trim()
         };
         
-        updateUserInLocalStorage(updatedUser);
+        saveUserToLocalStorage(updatedUser);
         setUser(updatedUser);
         finalUserName = name.trim();
       }

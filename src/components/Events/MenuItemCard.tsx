@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Clock, CheckCircle, AlertCircle, Edit, Trash2, Users, RefreshCw, Save, X } from 'lucide-react';
+import { User, Clock, CheckCircle, AlertCircle, Edit, Trash2, Users, RefreshCw, Save, X, UserPlus } from 'lucide-react';
 import { MenuItem } from '../../types';
 import { useStore } from '../../store/useStore';
 import { useAuth } from '../../hooks/useAuth';
@@ -16,9 +16,9 @@ interface MenuItemCardProps {
 }
 
 export function MenuItemCard({ item, canAssign, isLoading = false, onAssign, onEdit, onCancel }: MenuItemCardProps) {
-  // --- שינוי: הוספת menuItems מה-store ---
-  const { user, menuItems, assignments, updateMenuItem, deleteAssignment } = useStore();
-  const { isAdmin } = useAuth();
+  const { user, menuItems, assignments, updateMenuItem, deleteAssignment, deleteMenuItem, isAdmin } = useStore();
+
+
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(item.name);
   const [editedNotes, setEditedNotes] = useState(item.notes || '');
@@ -26,7 +26,8 @@ export function MenuItemCard({ item, canAssign, isLoading = false, onAssign, onE
   const [editedRequired, setEditedRequired] = useState(item.isRequired);
   const [isSaving, setIsSaving] = useState(false);
   const [isCanceling, setIsCanceling] = useState(false);
-  
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const categoryColors = {
     starter: 'bg-blue-50 text-blue-700 border-blue-200',
     main: 'bg-red-50 text-red-700 border-red-200',
@@ -45,12 +46,12 @@ export function MenuItemCard({ item, canAssign, isLoading = false, onAssign, onE
 
   const isAssigned = !!item.assignedTo;
   const isMyAssignment = isAssigned && item.assignedTo === user?.id;
+  const isCreator = user?.id === item.creatorId;
+  const canControlItem = isAdmin || (isCreator && !isAssigned);
 
   const itemAssignments = assignments.filter(a => a.menuItemId === item.id);
   const hasMultipleAssignments = itemAssignments.length > 1;
 
-  // --- שינוי: לוגיקה חדשה ומתוקנת לאיסוף משתתפים פעילים ---
-  // בונה רשימה של משתמשים ייחודיים על סמך פריטי התפריט שמשובצים כרגע באירוע
   const allEventMenuItems = menuItems.filter(mi => mi.eventId === item.eventId);
   const currentlyAssignedItems = allEventMenuItems.filter(mi => !!mi.assignedTo && !!mi.assignedToName);
 
@@ -64,29 +65,24 @@ export function MenuItemCard({ item, canAssign, isLoading = false, onAssign, onE
     }
     return users;
   }, [] as { userId: string; userName: string }[]);
-  // --- סוף הלוגיקה החדשה ---
 
   const handleSaveEdit = async () => {
     if (!editedName.trim()) {
       toast.error('שם הפריט לא יכול להיות ריק');
       return;
     }
-
     if (editedQuantity < 1 || editedQuantity > 100) {
       toast.error('הכמות חייבת להיות בין 1 ל-100');
       return;
     }
-
     setIsSaving(true);
-
     try {
       const updates = {
         name: editedName.trim(),
         notes: editedNotes.trim() || undefined,
         quantity: editedQuantity,
-        isRequired: editedRequired
+        isRequired: isAdmin ? editedRequired : item.isRequired,
       };
-
       const success = await FirebaseService.updateMenuItem(item.id, updates);
       if (success) {
         updateMenuItem(item.id, updates);
@@ -111,119 +107,83 @@ export function MenuItemCard({ item, canAssign, isLoading = false, onAssign, onE
     setIsEditing(false);
   };
 
-  const handleCancelAssignment = async () => {
-    if (!user) {
-      console.log('Cannot cancel - no user');
+  const handleDeleteItem = async () => {
+    if (!canControlItem) {
+      toast.error('אין לך הרשאה למחוק פריט זה.');
       return;
     }
-
-    if (!isMyAssignment) {
-      console.log('Cannot cancel - not user assignment');
-      toast.error('ניתן לבטל רק שיבוצים שלך');
+    if (!confirm(`האם אתה בטוח שברצונך למחוק את הפריט "${item.name}"?`)) {
       return;
     }
-
-    if (!confirm(`האם אתה בטוח שברצונך לבטל את השיבוץ של "${item.name}"?`)) {
-      return;
-    }
-
-    setIsCanceling(true);
-
+    setIsDeleting(true);
     try {
-      console.log('Starting assignment cancellation for item:', item.id);
-      
-      const userAssignment = assignments.find(a => 
-        a.menuItemId === item.id && a.userId === user.id
-      );
+      await FirebaseService.deleteMenuItem(item.id);
+      deleteMenuItem(item.id);
 
-      if (!userAssignment) {
-        console.log('No assignment found for user');
-        toast.error('לא נמצא שיבוץ לביטול');
-        return;
-      }
+      toast.success('הפריט נמחק בהצלחה');
+    } catch (error) {
+      console.error("Error deleting item:", error);
+      toast.error("שגיאה במחיקת הפריט.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
-      console.log('Found assignment to cancel:', userAssignment.id);
-      console.log('Deleting assignment...');
-      const deleteSuccess = await FirebaseService.deleteAssignment(userAssignment.id);
-      
-      if (!deleteSuccess) {
-        throw new Error('Failed to delete assignment');
-      }
-
+  const handleCancelAssignment = async () => {
+    if (!user || !isMyAssignment) return;
+    if (!confirm(`האם לבטל את השיבוץ של "${item.name}"?`)) return;
+    setIsCanceling(true);
+    try {
+      const userAssignment = assignments.find(a => a.menuItemId === item.id && a.userId === user.id);
+      if (!userAssignment) throw new Error('Assignment not found');
+      await FirebaseService.deleteAssignment(userAssignment.id);
       deleteAssignment(userAssignment.id);
-      console.log('Assignment deleted successfully');
-
-      const menuItemUpdates = {
-        assignedTo: undefined,
-        assignedToName: undefined,
-        assignedAt: undefined
-      };
-
-      console.log('Clearing menu item assignment...');
-      const menuUpdateSuccess = await FirebaseService.updateMenuItem(item.id, menuItemUpdates);
-      
-      if (menuUpdateSuccess) {
-        updateMenuItem(item.id, menuItemUpdates);
-        console.log('Menu item cleared successfully');
-      } else {
-        console.warn('Menu item update failed, but assignment was deleted');
-        updateMenuItem(item.id, menuItemUpdates);
-      }
-      
+      const menuItemUpdates = { assignedTo: undefined, assignedToName: undefined, assignedAt: undefined };
+      await FirebaseService.updateMenuItem(item.id, menuItemUpdates);
+      updateMenuItem(item.id, menuItemUpdates);
       toast.success('השיבוץ בוטל בהצלחה!');
-      
     } catch (error) {
       console.error('Error canceling assignment:', error);
-      toast.error('שגיאה בביטול השיבוץ. אנא נסה שוב.');
+      toast.error('שגיאה בביטול השיבוץ.');
     } finally {
       setIsCanceling(false);
     }
   };
 
+  // *** התיקון נמצא כאן ***
   const handleAdminCancelAssignment = async () => {
-    if (!item.assignedTo) {
-      toast.error('הפריט אינו משובץ.');
-      return;
-    }
-
+    if (!isAdmin || !item.assignedTo) return;
     if (!confirm(`האם אתה בטוח שברצונך לבטל את השיבוץ של "${item.assignedToName}" מהפריט "${item.name}"?`)) {
       return;
     }
-
     setIsCanceling(true);
-
     try {
+      // Find the corresponding assignment object
       const assignmentToCancel = assignments.find(a => a.menuItemId === item.id && a.userId === item.assignedTo);
 
+      // If a separate assignment object exists, delete it first
       if (assignmentToCancel) {
-        const deleteSuccess = await FirebaseService.deleteAssignment(assignmentToCancel.id);
-        if (deleteSuccess) {
-          deleteAssignment(assignmentToCancel.id);
-        } else {
-          throw new Error('מחיקת השיבוץ מהמאגר נכשלה.');
-        }
-      } else {
-        toast.error('לא נמצאה רשומת שיבוץ תואמת, הפריט יאופס.');
+        await FirebaseService.deleteAssignment(assignmentToCancel.id);
+        deleteAssignment(assignmentToCancel.id); // Update local store
       }
-
+      
+      // The main goal is to clear the assignment from the MenuItem.
+      // This runs regardless of whether the assignment object was found, ensuring the item is cleared.
       const menuItemUpdates = {
         assignedTo: undefined,
         assignedToName: undefined,
         assignedAt: undefined
       };
       
-      const menuUpdateSuccess = await FirebaseService.updateMenuItem(item.id, menuItemUpdates);
-      
-      if (menuUpdateSuccess) {
-        updateMenuItem(item.id, menuItemUpdates);
-        toast.success('השיבוץ בוטל בהצלחה!');
-      } else {
-        throw new Error('איפוס פריט התפריט נכשל.');
-      }
+      await FirebaseService.updateMenuItem(item.id, menuItemUpdates, true); // skipAdminCheck = true
+      updateMenuItem(item.id, menuItemUpdates); // Update local store
+
+      // Only show ONE toast, and it's a success toast.
+      toast.success('השיבוץ בוטל בהצלחה!');
 
     } catch (error) {
       console.error('Error canceling assignment as admin:', error);
-      toast.error('שגיאה בביטול השיבוץ. אנא נסה שוב.');
+      toast.error('שגיאה בביטול השיבוץ.');
     } finally {
       setIsCanceling(false);
     }
@@ -231,30 +191,21 @@ export function MenuItemCard({ item, canAssign, isLoading = false, onAssign, onE
 
   const handleReplaceUser = async (newUserId: string, newUserName: string) => {
     if (!isAdmin || !item.assignedTo) return;
-
-    if (!confirm(`האם להחליף את ${item.assignedToName} ב-${newUserName}?`)) {
-      return;
-    }
-
+    if (!confirm(`האם להחליף את ${item.assignedToName} ב-${newUserName}?`)) return;
     try {
-      const currentAssignment = assignments.find(a => 
-        a.menuItemId === item.id && a.userId === item.assignedTo
-      );
-
+      const currentAssignment = assignments.find(a => a.menuItemId === item.id && a.userId === item.assignedTo);
       if (currentAssignment) {
         const success = await FirebaseService.updateAssignment(currentAssignment.id, {
           userId: newUserId,
           userName: newUserName,
           updatedAt: Date.now()
         });
-
         if (success) {
           await FirebaseService.updateMenuItem(item.id, {
             assignedTo: newUserId,
             assignedToName: newUserName,
             assignedAt: Date.now()
           }, true);
-
           toast.success('המשתמש הוחלף בהצלחה');
         }
       }
@@ -265,264 +216,95 @@ export function MenuItemCard({ item, canAssign, isLoading = false, onAssign, onE
   };
 
   return (
-    <div className={`rounded-lg border-2 p-4 transition-all duration-200 ${
-      isLoading || isCanceling
-        ? 'opacity-50 pointer-events-none'
-        : isAssigned 
-          ? isMyAssignment
-            ? 'bg-blue-50 border-blue-200' 
-            : 'bg-green-50 border-green-200'
-          : canAssign 
-            ? 'bg-white border-gray-200 hover:border-orange-300 hover:shadow-md cursor-pointer' 
-            : 'bg-gray-50 border-gray-200'
-    }`}
-    onClick={canAssign && !isAssigned && !isLoading && !isEditing && !isCanceling ? onAssign : undefined}
-    >
-      {/* Header */}
+    <div className={`rounded-lg border-2 p-4 transition-all duration-200 ${isLoading || isCanceling || isDeleting ? 'opacity-50 pointer-events-none' : isAssigned ? (isMyAssignment ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200') : canAssign ? 'bg-white border-gray-200 hover:border-orange-300 hover:shadow-md cursor-pointer' : 'bg-gray-50 border-gray-200'}`}
+         onClick={canAssign && !isAssigned && !isLoading && !isEditing && !isCanceling ? onAssign : undefined}>
+      
       <div className="flex items-center justify-between mb-3">
         {isEditing ? (
-          <input
-            type="text"
-            value={editedName}
-            onChange={(e) => setEditedName(e.target.value)}
-            className="font-medium text-gray-900 bg-white border border-gray-300 rounded px-2 py-1 text-sm flex-1 ml-2"
-            placeholder="שם הפריט"
-          />
+          <input type="text" value={editedName} onChange={(e) => setEditedName(e.target.value)} className="font-medium text-gray-900 bg-white border border-gray-300 rounded px-2 py-1 text-sm flex-1 ml-2" placeholder="שם הפריט" />
         ) : (
           <h3 className="font-medium text-gray-900 truncate">{item.name}</h3>
         )}
-        
-        <div className={`px-2 py-1 rounded-full text-xs font-medium border ${
-          categoryColors[item.category] || categoryColors.other
-        }`}>
-          {categoryNames[item.category] || categoryNames.other}
-        </div>
+        <div className={`px-2 py-1 rounded-full text-xs font-medium border ${categoryColors[item.category] || categoryColors.other}`}>{categoryNames[item.category] || categoryNames.other}</div>
       </div>
-
-      {/* Quantity and Required indicator */}
+      
       <div className="flex items-center justify-between text-gray-600 mb-3">
         {isEditing ? (
-          <div className="flex items-center space-x-2 rtl:space-x-reverse">
-            <span className="text-sm">כמות:</span>
-            <input
-              type="number"
-              min="1"
-              max="100"
-              value={editedQuantity}
-              onChange={(e) => setEditedQuantity(parseInt(e.target.value) || 1)}
-              className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
-            />
-          </div>
+          <div className="flex items-center space-x-2 rtl:space-x-reverse"><span className="text-sm">כמות:</span><input type="number" min="1" max="100" value={editedQuantity} onChange={(e) => setEditedQuantity(parseInt(e.target.value) || 1)} className="w-16 px-2 py-1 border border-gray-300 rounded text-sm" /></div>
         ) : (
           <span className="text-sm">כמות: {item.quantity}</span>
         )}
         
         {isEditing ? (
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={editedRequired}
-              onChange={(e) => setEditedRequired(e.target.checked)}
-              className="rounded border-gray-300 text-red-600 focus:ring-red-500 ml-1"
-            />
-            <span className="text-xs text-red-600 font-medium">חובה</span>
-          </label>
+          isAdmin && <label className="flex items-center"><input type="checkbox" checked={editedRequired} onChange={(e) => setEditedRequired(e.target.checked)} className="rounded border-gray-300 text-red-600 focus:ring-red-500 ml-1" /><span className="text-xs text-red-600 font-medium">חובה</span></label>
         ) : (
-          item.isRequired && (
-            <div className="flex items-center">
-              <AlertCircle className="h-4 w-4 text-red-500 ml-1" />
-              <span className="text-xs text-red-600 font-medium">חובה</span>
-            </div>
-          )
+          item.isRequired && <div className="flex items-center"><AlertCircle className="h-4 w-4 text-red-500 ml-1" /><span className="text-xs text-red-600 font-medium">חובה</span></div>
         )}
       </div>
 
-      {/* Notes editing */}
       {isEditing && (
-        <div className="mb-3">
-          <textarea
-            value={editedNotes}
-            onChange={(e) => setEditedNotes(e.target.value)}
-            placeholder="הערות (אופציונלי)"
-            rows={2}
-            className="w-full px-2 py-1 border border-gray-300 rounded text-sm resize-none"
-          />
-        </div>
+        <div className="mb-3"><textarea value={editedNotes} onChange={(e) => setEditedNotes(e.target.value)} placeholder="הערות (אופציונלי)" rows={2} className="w-full px-2 py-1 border border-gray-300 rounded text-sm resize-none" /></div>
       )}
-
-      {/* Assignment Status */}
+      
       {isAssigned ? (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className={`flex items-center ${isMyAssignment ? 'text-blue-700' : 'text-green-700'}`}>
-              <CheckCircle className="h-4 w-4 ml-2" />
-              <span className="text-sm font-medium">
-                {isMyAssignment ? 'השיבוץ שלי' : 'משובץ'}
-              </span>
-              {hasMultipleAssignments && (
-                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full mr-2">
-                  {itemAssignments.length} שיבוצים
-                </span>
-              )}
+              <CheckCircle className="h-4 w-4 ml-2" /><span className="text-sm font-medium">{isMyAssignment ? 'השיבוץ שלי' : 'משובץ'}</span>
+              {hasMultipleAssignments && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full mr-2">{itemAssignments.length} שיבוצים</span>}
             </div>
             <div className="text-left">
               <p className="text-sm font-medium text-gray-900">{item.assignedToName}</p>
-              {item.assignedAt && (
-                <p className="text-xs text-gray-600">
-                  <Clock className="h-3 w-3 inline ml-1" />
-                  {new Date(item.assignedAt).toLocaleDateString('he-IL')}
-                </p>
-              )}
+              {item.assignedAt && <p className="text-xs text-gray-600"><Clock className="h-3 w-3 inline ml-1" />{new Date(item.assignedAt).toLocaleDateString('he-IL')}</p>}
             </div>
           </div>
-
-          {/* Admin replacement dropdown */}
           {isAdmin && !isMyAssignment && allUsers.length > 1 && (
             <div className="pt-2 border-t border-gray-200">
-              <select
-                onChange={(e) => {
-                  const [userId, userName] = e.target.value.split('|');
-                  if (userId && userName && userId !== item.assignedTo) {
-                    handleReplaceUser(userId, userName);
-                  }
-                  e.target.value = '';
-                }}
-                className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                defaultValue=""
-              >
+              <select onChange={(e) => { const [userId, userName] = e.target.value.split('|'); if (userId && userName && userId !== item.assignedTo) { handleReplaceUser(userId, userName); } e.target.value = ''; }} className="w-full text-xs border border-gray-300 rounded px-2 py-1" defaultValue="">
                 <option value="">החלף משתמש...</option>
-                {allUsers
-                  .filter(u => u.userId !== item.assignedTo)
-                  .map(u => (
-                    <option key={`${u.userId}|${u.userName}`} value={`${u.userId}|${u.userName}`}>
-                      {u.userName}
-                    </option>
-                  ))}
+                {allUsers.filter(u => u.userId !== item.assignedTo).map(u => (<option key={`${u.userId}|${u.userName}`} value={`${u.userId}|${u.userName}`}>{u.userName}</option>))}
               </select>
             </div>
           )}
-
-          {/* Action buttons for user's own assignment */}
           {isMyAssignment && canAssign && (
             <div className="flex space-x-2 rtl:space-x-reverse pt-2 border-t border-blue-200">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (onEdit) onEdit();
-                }}
-                disabled={isLoading || isCanceling}
-                className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white px-3 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
-              >
-                <Edit className="h-3 w-3 ml-1" />
-                ערוך
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCancelAssignment();
-                }}
-                disabled={isLoading || isCanceling}
-                className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white px-3 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"
-              >
-                {isCanceling ? (
-                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                ) : (
-                  <>
-                    <Trash2 className="h-3 w-3 ml-1" />
-                    בטל
-                  </>
-                )}
-              </button>
+              <button onClick={(e) => { e.stopPropagation(); if (onEdit) onEdit(); }} disabled={isLoading || isCanceling} className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white px-3 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center"><Edit className="h-3 w-3 ml-1" />ערוך שיבוץ</button>
+              <button onClick={(e) => { e.stopPropagation(); handleCancelAssignment(); }} disabled={isLoading || isCanceling} className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white px-3 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center">{isCanceling ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div> : <><Trash2 className="h-3 w-3 ml-1" />בטל שיבוץ</>}</button>
             </div>
           )}
         </div>
       ) : (
         <div className="flex items-center justify-between">
-          <div className="flex items-center text-gray-500">
-            <User className="h-4 w-4 ml-2" />
-            <span className="text-sm">זמין לשיבוץ</span>
+            {item.creatorId && <div className="flex items-center text-xs text-gray-500"><UserPlus className="h-3 w-3 ml-1" /><span>{item.creatorName === user?.name ? 'נוצר על ידי' : `נוצר ע"י ${item.creatorName}`}</span></div>}
+            {canAssign && !isEditing && (<button onClick={(e) => { e.stopPropagation(); onAssign(); }} disabled={isLoading || isCanceling} className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white px-3 py-1 rounded text-sm font-medium transition-colors">שבץ אותי</button>)}
+        </div>
+      )}
+      
+      <div className="mt-3 pt-3 border-t border-gray-200">
+        {isEditing ? (
+            <div className="flex space-x-2 rtl:space-x-reverse">
+                <button onClick={handleSaveEdit} disabled={isSaving} className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white px-3 py-1 rounded text-sm font-medium transition-colors flex items-center justify-center">{isSaving ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div> : <><Save className="h-3 w-3 ml-1" />שמור</>}</button>
+                <button onClick={handleCancelEdit} disabled={isSaving} className="flex-1 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-300 text-white px-3 py-1 rounded text-sm font-medium transition-colors flex items-center justify-center"><X className="h-3 w-3 ml-1" />ביטול</button>
+            </div>
+        ) : (
+          <div className="flex justify-between items-center">
+            {item.creatorId && item.creatorName !== user?.name && <div className="flex items-center text-xs text-gray-500"></div>}
+            {canControlItem && (
+                <div className="flex space-x-2 rtl:space-x-reverse">
+                    <button onClick={(e) => { e.stopPropagation(); setIsEditing(true); }} className="p-1 text-gray-500 hover:text-blue-600" title="ערוך פריט"><Edit className="h-4 w-4" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteItem(); }} disabled={isDeleting} className="p-1 text-gray-500 hover:text-red-600" title="מחק פריט">{isDeleting ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div> : <Trash2 className="h-4 w-4" />}</button>
+                </div>
+            )}
           </div>
-          {canAssign && !isEditing && (
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                onAssign();
-              }}
-              disabled={isLoading || isCanceling}
-              className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white px-3 py-1 rounded text-sm font-medium transition-colors"
-            >
-              שבץ אותי
-            </button>
-          )}
-        </div>
+        )}
+      </div>
+
+      {isAdmin && isAssigned && !isMyAssignment && (
+         <div className="mt-3 pt-3 border-t border-gray-200">
+            <button onClick={handleAdminCancelAssignment} disabled={isCanceling} className="w-full bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1 rounded text-xs font-medium transition-colors flex items-center justify-center">{isCanceling ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-700"></div> : "בטל שיבוץ (מנהל)"}</button>
+         </div>
       )}
 
-      {/* Admin controls for items not assigned to the admin themselves */}
-      {isAdmin && !isMyAssignment && (
-        <div className="mt-3 pt-3 border-t border-gray-200">
-          {isEditing ? (
-            <div className="flex space-x-2 rtl:space-x-reverse">
-              <button
-                onClick={handleSaveEdit}
-                disabled={isSaving}
-                className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white px-3 py-1 rounded text-sm font-medium transition-colors flex items-center justify-center"
-              >
-                {isSaving ? (
-                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                ) : (
-                  <>
-                    <Save className="h-3 w-3 ml-1" />
-                    שמור
-                  </>
-                )}
-              </button>
-              <button
-                onClick={handleCancelEdit}
-                disabled={isSaving}
-                className="flex-1 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-300 text-white px-3 py-1 rounded text-sm font-medium transition-colors flex items-center justify-center"
-              >
-                <X className="h-3 w-3 ml-1" />
-                ביטול
-              </button>
-            </div>
-          ) : (
-            <div className="flex space-x-2 rtl:space-x-reverse">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsEditing(true);
-                }}
-                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors flex items-center justify-center"
-              >
-                <Edit className="h-3 w-3 ml-1" />
-                ערוך פריט
-              </button>
-
-              {isAssigned && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleAdminCancelAssignment();
-                  }}
-                  disabled={isCanceling}
-                  className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white px-3 py-1 rounded text-sm font-medium transition-colors flex items-center justify-center"
-                >
-                  {isCanceling ? (
-                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                  ) : (
-                    <>
-                      <Trash2 className="h-3 w-3 ml-1" />
-                      בטל שיבוץ
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Notes display */}
       {!isEditing && item.notes && (
         <div className="mt-3 pt-3 border-t border-gray-200">
           <p className="text-sm text-gray-600">{item.notes}</p>

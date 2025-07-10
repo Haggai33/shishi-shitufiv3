@@ -330,24 +330,28 @@ export class FirebaseService {
   }
 
   // Menu Items
-  static async createMenuItem(item: Omit<MenuItem, 'id'>): Promise<string | null> {
+  static async createMenuItem(item: Omit<MenuItem, 'id'>, skipAdminCheck: boolean = false): Promise<string | null> {
     try {
-      // Check admin permissions
-      if (!auth.currentUser) {
-        throw new Error('נדרשת התחברות כמנהל');
-      }
-
-      const isAdmin = await this.checkAdminStatus(auth.currentUser.uid);
-      if (!isAdmin) {
-        throw new Error('אין הרשאות מנהל');
+      // If we are not skipping the check, validate admin status
+      if (!skipAdminCheck) {
+        if (!auth.currentUser) {
+          throw new Error('נדרשת התחברות כמנהל');
+        }
+        const isAdmin = await this.checkAdminStatus(auth.currentUser.uid);
+        if (!isAdmin) {
+          throw new Error('אין הרשאות מנהל');
+        }
       }
 
       const menuItemsRef = ref(database, 'menuItems');
       const newItemRef = push(menuItemsRef);
+      
+      const creatorInfo = auth.currentUser ? { createdBy: auth.currentUser.uid } : {};
+
       const cleanedItem = cleanObject({ 
         ...item, 
         id: newItemRef.key!,
-        createdBy: auth.currentUser.uid
+        ...creatorInfo
       });
       
       await set(newItemRef, cleanedItem);
@@ -364,21 +368,17 @@ export class FirebaseService {
       
       const itemRef = ref(database, `menuItems/${itemId}`);
       
-      // Create update object with proper structure
       const updateData: any = {};
       
-      // Handle each field properly
       Object.keys(updates).forEach(key => {
         const value = updates[key as keyof MenuItem];
         if (value === undefined) {
-          // For Firebase, use null to remove fields
           updateData[key] = null;
         } else {
           updateData[key] = value;
         }
       });
       
-      // Add metadata only if not skipping admin check
       if (!skipAdminCheck) {
         updateData.updatedAt = Date.now();
         if (auth.currentUser) {
@@ -397,23 +397,22 @@ export class FirebaseService {
     }
   }
 
-  static async deleteMenuItem(itemId: string): Promise<boolean> {
+    static async deleteMenuItem(itemId: string): Promise<boolean> {
     try {
-      // Check admin permissions
+      // עכשיו כשכל משתמש מאומת (גם אנונימית), אנחנו רק צריכים לוודא זאת.
+      // חוקי האבטחה ב-Firebase יאכפו את ההרשאות (מי יכול למחוק מה).
       if (!auth.currentUser) {
-        throw new Error('נדרשת התחברות כמנהל');
+        // הודעת שגיאה למקרה קיצון שבו האימות נכשל
+        throw new Error('נדרשת התחברות. אנא רענן את הדף.');
       }
-
-      const isAdmin = await this.checkAdminStatus(auth.currentUser.uid);
-      if (!isAdmin) {
-        throw new Error('אין הרשאות מנהל');
-      }
+      console.log(`מנסה למחוק את פריט ${itemId} בתור משתמש ${auth.currentUser.uid}`);
 
       const itemRef = ref(database, `menuItems/${itemId}`);
       await remove(itemRef);
       return true;
     } catch (error) {
       console.error('Error deleting menu item:', error);
+      // מעבירים את השגיאה הלאה כדי שהרכיב הקורא יוכל להציג הודעה למשתמש
       throw error;
     }
   }
@@ -443,17 +442,14 @@ export class FirebaseService {
     try {
       console.log('Creating assignment:', assignment);
       
-      // Use transaction on menu item to atomically claim it
       const menuItemRef = ref(database, `menuItems/${assignment.menuItemId}`);
       const assignmentsRef = ref(database, 'assignments');
       
-      // Use atomic transaction on menu item to claim it
       const result = await runTransaction(menuItemRef, (currentMenuItem) => {
         if (!currentMenuItem) {
           throw new Error('פריט התפריט לא נמצא');
         }
         
-        // Check if item is already assigned
         if (currentMenuItem.assignedTo) {
           if (currentMenuItem.assignedTo === assignment.userId) {
             throw new Error('כבר יש לך שיבוץ לפריט זה');
@@ -462,7 +458,6 @@ export class FirebaseService {
           }
         }
         
-        // Claim the item atomically
         return {
           ...currentMenuItem,
           assignedTo: assignment.userId,
@@ -475,7 +470,6 @@ export class FirebaseService {
         throw new Error('השיבוץ נכשל - נסה שוב');
       }
       
-      // Menu item successfully claimed, now create the assignment record
       try {
         const newAssignmentRef = push(assignmentsRef);
         const assignmentData = {
@@ -491,7 +485,6 @@ export class FirebaseService {
           updatedAt: Date.now()
         };
         
-        // Add optional fields
         if (assignment.userPhone) {
           (assignmentData as any).userPhone = assignment.userPhone;
         }
@@ -504,7 +497,6 @@ export class FirebaseService {
         
         return newAssignmentRef.key!;
       } catch (assignmentError) {
-        // If assignment creation fails, we need to rollback the menu item claim
         console.error('Failed to create assignment record, rolling back menu item:', assignmentError);
         
         try {
@@ -522,7 +514,6 @@ export class FirebaseService {
     } catch (error) {
       console.error('Error creating assignment:', error);
       
-      // Pass through specific error messages
       if (error instanceof Error && (
         error.message.includes('מצטערים, מישהו אחר') ||
         error.message.includes('כבר יש לך שיבוץ') ||
@@ -541,17 +532,14 @@ export class FirebaseService {
       
       const assignmentRef = ref(database, `assignments/${assignmentId}`);
       
-      // Create update object with proper structure
       const updateData: any = {
         updatedAt: Date.now()
       };
       
-      // Handle each field properly
       Object.keys(updates).forEach(key => {
         if (key !== 'id') {
           const value = updates[key as keyof Assignment];
           if (value === undefined) {
-            // For Firebase, use null to remove fields
             updateData[key] = null;
           } else {
             updateData[key] = value;

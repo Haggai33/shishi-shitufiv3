@@ -4,6 +4,7 @@ import { useStore } from '../../store/useStore';
 import { FirebaseService } from '../../services/firebaseService';
 import { ShishiEvent, MenuItem, MenuCategory } from '../../types';
 import { PresetListsManager } from './PresetListsManager';
+import { useAuth } from '../../hooks/useAuth';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 import toast from 'react-hot-toast';
@@ -26,7 +27,8 @@ interface ImportItem {
 type ImportMethod = 'excel' | 'csv' | 'text' | 'preset';
 
 export function ImportItemsModal({ event, onClose }: ImportItemsModalProps) {
-  const { menuItems, addMenuItem } = useStore();
+  const { menuItems } = useStore();
+  const { user: authUser } = useAuth();
   const [activeMethod, setActiveMethod] = useState<ImportMethod>('preset');
   const [textInput, setTextInput] = useState('');
   const [importItems, setImportItems] = useState<ImportItem[]>([]);
@@ -34,7 +36,6 @@ export function ImportItemsModal({ event, onClose }: ImportItemsModalProps) {
   const [showPreview, setShowPreview] = useState(false);
   const [showPresetManager, setShowPresetManager] = useState(false);
 
-  // State for handling duplicates
   const [showDuplicateConfirm, setShowDuplicateConfirm] = useState(false);
   const [itemsToImport, setItemsToImport] = useState<{ newItems: ImportItem[], duplicateItems: ImportItem[] }>({ newItems: [], duplicateItems: [] });
 
@@ -53,11 +54,9 @@ export function ImportItemsModal({ event, onClose }: ImportItemsModalProps) {
     lines.forEach((line) => {
       const parts = line.split(',').map(part => part.trim());
       if (parts.length === 0 || !parts[0]) return;
-
       const name = parts[0];
       const quantity = parts[1] ? parseInt(parts[1]) || 1 : 1;
       const notes = parts[2] || undefined;
-
       if (name.length < 2) {
         items.push({ name, category: 'main', quantity: 1, notes, isRequired: false, selected: false, error: 'שם הפריט חייב להכיל לפחות 2 תווים' });
         return;
@@ -83,7 +82,6 @@ export function ImportItemsModal({ event, onClose }: ImportItemsModalProps) {
           const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
           const items: ImportItem[] = [];
           const startRow = jsonData[0] && typeof jsonData[0][0] === 'string' && (jsonData[0][0].includes('שם') || jsonData[0][0].includes('name')) ? 1 : 0;
-
           for (let i = startRow; i < jsonData.length; i++) {
             const row = jsonData[i];
             if (!row || !row[0]) continue;
@@ -184,10 +182,19 @@ export function ImportItemsModal({ event, onClose }: ImportItemsModalProps) {
     try {
       for (const item of itemsToProcess) {
         try {
-          const menuItem: Omit<MenuItem, 'id'> = { eventId: event.id, name: item.name, category: item.category, quantity: item.quantity, notes: item.notes, isRequired: item.isRequired, createdAt: Date.now() };
+          const menuItem: Omit<MenuItem, 'id'> = { 
+            eventId: event.id, 
+            name: item.name, 
+            category: item.category, 
+            quantity: item.quantity, 
+            notes: item.notes, 
+            isRequired: item.isRequired, 
+            createdAt: Date.now(),
+            creatorId: authUser?.uid || 'admin',
+            creatorName: authUser?.displayName || 'Admin'
+          };
           const itemId = await FirebaseService.createMenuItem(menuItem);
           if (itemId) {
-            addMenuItem({ ...menuItem, id: itemId });
             successCount++;
           } else { errorCount++; }
         } catch (error) { console.error(`Error importing item ${item.name}:`, error); errorCount++; }
@@ -238,25 +245,13 @@ export function ImportItemsModal({ event, onClose }: ImportItemsModalProps) {
             איך תרצה להמשיך?
           </p>
           <div className="space-y-3">
-            <button
-              onClick={() => executeImport([...itemsToImport.newItems, ...itemsToImport.duplicateItems])}
-              disabled={isImporting}
-              className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white py-2 px-4 rounded-lg font-medium transition-colors"
-            >
+            <button onClick={() => executeImport([...itemsToImport.newItems, ...itemsToImport.duplicateItems])} disabled={isImporting} className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white py-2 px-4 rounded-lg font-medium transition-colors">
               {isImporting ? 'מייבא...' : `ייבא הכל (${itemsToImport.newItems.length + itemsToImport.duplicateItems.length} פריטים)`}
             </button>
-            <button
-              onClick={() => executeImport(itemsToImport.newItems)}
-              disabled={isImporting || itemsToImport.newItems.length === 0}
-              className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white py-2 px-4 rounded-lg font-medium transition-colors"
-            >
+            <button onClick={() => executeImport(itemsToImport.newItems)} disabled={isImporting || itemsToImport.newItems.length === 0} className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white py-2 px-4 rounded-lg font-medium transition-colors">
               {isImporting ? 'מייבא...' : `ייבא חדשים בלבד (${itemsToImport.newItems.length} פריטים)`}
             </button>
-            <button
-              onClick={() => setShowDuplicateConfirm(false)}
-              disabled={isImporting}
-              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-medium transition-colors"
-            >
+            <button onClick={() => setShowDuplicateConfirm(false)} disabled={isImporting} className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-medium transition-colors">
               ביטול
             </button>
           </div>
@@ -266,12 +261,7 @@ export function ImportItemsModal({ event, onClose }: ImportItemsModalProps) {
   }
 
   if (showPresetManager) {
-    return (
-      <PresetListsManager
-        onClose={() => setShowPresetManager(false)}
-        onSelectList={handlePresetListSelect}
-      />
-    );
+    return (<PresetListsManager onClose={() => setShowPresetManager(false)} onSelectList={handlePresetListSelect} />);
   }
 
   return (

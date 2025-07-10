@@ -1,11 +1,12 @@
 import { create } from 'zustand';
+import { User as AuthUser } from 'firebase/auth';
 import { User, ShishiEvent, MenuItem, Assignment, AppState } from '../types';
-import { generateUserId, saveUserToLocalStorage, getUserFromLocalStorage } from '../utils/userUtils';
+import { saveUserToLocalStorage, getUserFromLocalStorage } from '../utils/userUtils';
 
 interface StoreActions {
   // User actions
   setUser: (user: User | null) => void;
-  initializeUser: () => void;
+  initializeUser: (authUser: AuthUser) => void;
   
   // Events actions
   setEvents: (events: ShishiEvent[]) => void;
@@ -44,18 +45,31 @@ export const useStore = create<AppState & StoreActions>((set, get) => ({
   // User actions
   setUser: (user) => set({ user }),
   
-  initializeUser: () => {
+  initializeUser: (authUser) => {
+    if (!authUser) {
+      console.error("initializeUser was called without an authenticated user.");
+      return;
+    }
     try {
-      let user = getUserFromLocalStorage();
-      if (!user) {
-        user = {
-          id: generateUserId(),
-          name: '',
-          createdAt: Date.now()
-        };
-        saveUserToLocalStorage(user);
-      }
-      set({ user });
+      const localDetails = getUserFromLocalStorage(authUser.uid);
+
+      const finalUser: User = {
+        id: authUser.uid,
+        name: authUser.displayName || localDetails?.name || '', // תן עדיפות לשם מ-Firebase אם קיים
+        phone: localDetails?.phone || '',
+        email: authUser.email || localDetails?.email || '',
+        isAdmin: get().isAdmin,
+        createdAt: localDetails?.createdAt || Date.now(),
+      };
+
+      saveUserToLocalStorage(finalUser);
+      set({ user: finalUser });
+      
+      console.log('User initialized successfully:', { 
+        uid: finalUser.id, 
+        hasName: !!finalUser.name,
+        isAdmin: finalUser.isAdmin 
+      });
     } catch (error) {
       console.error('Error initializing user:', error);
       set({ error: 'שגיאה באתחול המשתמש' });

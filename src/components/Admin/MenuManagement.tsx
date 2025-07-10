@@ -15,8 +15,9 @@ interface MenuManagementProps {
 }
 
 export function MenuManagement({ event, onBack }: MenuManagementProps) {
-  const { menuItems, assignments, deleteMenuItem } = useStore();
-  const { isAdmin } = useAuth();
+  const { menuItems, assignments, deleteMenuItem, isAdmin } = useStore();
+
+ 
   const [showItemForm, setShowItemForm] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [managingAssignments, setManagingAssignments] = useState<MenuItem | null>(null);
