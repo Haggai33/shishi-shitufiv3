@@ -6,7 +6,6 @@ import { AssignmentManager } from './AssignmentManager';
 import { ImportItemsModal } from './ImportItemsModal';
 import { FirebaseService } from '../../services/firebaseService';
 import { ShishiEvent, MenuItem } from '../../types';
-import { useAuth } from '../../hooks/useAuth';
 import toast from 'react-hot-toast';
 
 interface MenuManagementProps {
@@ -15,7 +14,8 @@ interface MenuManagementProps {
 }
 
 export function MenuManagement({ event, onBack }: MenuManagementProps) {
-  const { menuItems, assignments, deleteMenuItem, isAdmin } = useStore();
+  const { user, menuItems, assignments, deleteMenuItem } = useStore();
+  const isAdmin = user?.isAdmin || false;
 
  
   const [showItemForm, setShowItemForm] = useState(false);

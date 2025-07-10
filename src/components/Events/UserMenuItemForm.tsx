@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { X, ChefHat, Hash, FileText, AlertCircle, User } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { FirebaseService } from '../../services/firebaseService';
+import { database } from '../../lib/firebase';
+import { ref, push, update } from 'firebase/database';
 import { ShishiEvent, MenuItem, MenuCategory } from '../../types';
 import toast from 'react-hot-toast';
 // 1. הסרת ייבוא מיותר
@@ -69,12 +71,12 @@ export function UserMenuItemForm({ event, onClose }: UserMenuItemFormProps) {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent | null, assignToSelf: boolean = false) => {
+    if (e) e.preventDefault();
 
     if (!user) {
-        toast.error('שגיאת משתמש, נסה לרענן את הדף.');
-        return;
+      toast.error('שגיאת משתמש, נסה לרענן את הדף.');
+      return;
     }
 
     if (!validateForm()) {
@@ -85,14 +87,14 @@ export function UserMenuItemForm({ event, onClose }: UserMenuItemFormProps) {
     setIsSubmitting(true);
 
     try {
-        let finalUserName = user.name;
+      let finalUserName = user.name;
 
-        if (isNameRequired) {
-            const updatedUser = { ...user, name: newUserName.trim() };
-            saveUserToLocalStorage(updatedUser);
-            setUser(updatedUser);
-            finalUserName = newUserName.trim();
-        }
+      if (isNameRequired) {
+        const updatedUser = { ...user, name: newUserName.trim() };
+        saveUserToLocalStorage(updatedUser);
+        setUser(updatedUser);
+        finalUserName = newUserName.trim();
+      }
 
       const eventMenuItems = menuItems.filter(mi => mi.eventId === event.id);
       const isDuplicate = eventMenuItems.some(
@@ -106,26 +108,67 @@ export function UserMenuItemForm({ event, onClose }: UserMenuItemFormProps) {
         }
       }
 
-      const newItemData: Omit<MenuItem, 'id'> = {
-        ...formData,
-        name: formData.name.trim(),
-        notes: formData.notes.trim() || undefined,
-        eventId: event.id,
-        createdAt: Date.now(),
-        creatorId: user.id,
-        creatorName: finalUserName,
-        isRequired: false
-      };
-      
-      const itemId = await FirebaseService.createMenuItem(newItemData, true);
-      if (itemId) {
-        // 3. הסרת השורה הזו
-        // addMenuItem({ ...newItemData, id: itemId });
-        toast.success('הפריט נוסף בהצלחה!');
-        onClose();
+      if (assignToSelf) {
+        // Atomic write for both item and assignment
+        const newItemRef = push(ref(database, 'menuItems'));
+        const newItemId = newItemRef.key!;
+        const newAssignmentRef = push(ref(database, 'assignments'));
+        const newAssignmentId = newAssignmentRef.key!;
+
+        const updates: Record<string, unknown> = {};
+        const now = Date.now();
+
+        const newItemData = {
+          ...formData,
+          id: newItemId,
+          name: formData.name.trim(),
+          notes: formData.notes.trim(),
+          eventId: event.id,
+          createdAt: now,
+          creatorId: user.id,
+          creatorName: finalUserName,
+          isRequired: false,
+          assignedTo: user.id,
+          assignedToName: finalUserName,
+          assignedAt: now
+        };
+
+        const newAssignmentData = {
+          id: newAssignmentId,
+          eventId: event.id,
+          menuItemId: newItemId,
+          userId: user.id,
+          userName: finalUserName || '',
+          quantity: newItemData.quantity,
+          status: 'confirmed' as const,
+          assignedAt: now,
+          updatedAt: now
+        };
+
+        updates[`/menuItems/${newItemId}`] = newItemData;
+        updates[`/assignments/${newAssignmentId}`] = newAssignmentData;
+
+        await update(ref(database), updates);
+        toast.success('הפריט נוסף ושובץ בהצלחה!');
       } else {
-        throw new Error('Failed to create menu item');
+        // Original logic for just creating the item
+        const newItemData: Omit<MenuItem, 'id'> = {
+          ...formData,
+          name: formData.name.trim(),
+          notes: formData.notes.trim(),
+          eventId: event.id,
+          createdAt: Date.now(),
+          creatorId: user.id,
+          creatorName: finalUserName,
+          isRequired: false
+        };
+        
+        await FirebaseService.createMenuItem(newItemData, true);
+        toast.success('הפריט נוסף בהצלחה!');
       }
+      
+      onClose();
+
     } catch (error) {
       console.error('Error saving menu item:', error);
       toast.error('שגיאה בהוספת הפריט. אנא נסה שוב.');
@@ -134,7 +177,7 @@ export function UserMenuItemForm({ event, onClose }: UserMenuItemFormProps) {
     }
   };
   
-  const handleInputChange = (field: keyof typeof formData, value: any) => {
+  const handleInputChange = (field: keyof typeof formData, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field as keyof FormErrors]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
@@ -151,7 +194,7 @@ export function UserMenuItemForm({ event, onClose }: UserMenuItemFormProps) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6">
+        <form onSubmit={(e) => handleSubmit(e, false)} className="p-6">
           {isNameRequired && (
             <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">שם מלא (יוצג לכולם) *</label>
@@ -208,11 +251,14 @@ export function UserMenuItemForm({ event, onClose }: UserMenuItemFormProps) {
             </div>
           </div>
 
-          <div className="flex space-x-3 rtl:space-x-reverse">
-            <button type="submit" disabled={isSubmitting} className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center">
-              {isSubmitting ? (<><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white ml-2"></div>מוסיף...</>) : 'הוסף פריט'}
+          <div className="space-y-3">
+            <button type="button" onClick={() => handleSubmit(null, true)} disabled={isSubmitting} className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center">
+              {isSubmitting ? (<><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white ml-2"></div>מוסיף...</>) : 'הוסף ושבץ עליי'}
             </button>
-            <button type="button" onClick={onClose} disabled={isSubmitting} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-medium transition-colors disabled:opacity-50">
+            <button type="submit" disabled={isSubmitting} className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center">
+              {isSubmitting ? (<><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white ml-2"></div>מוסיף...</>) : 'הוסף לרשימה הכללית'}
+            </button>
+            <button type="button" onClick={onClose} disabled={isSubmitting} className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-medium transition-colors disabled:opacity-50">
               ביטול
             </button>
           </div>

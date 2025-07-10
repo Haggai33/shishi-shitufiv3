@@ -10,7 +10,8 @@ interface HeaderProps {
 }
 
 export function Header({ currentView, onViewChange }: HeaderProps) {
-  const { user, isAdmin } = useStore(); // קורא מה-store
+  const { user } = useStore();
+  const isAdmin = user?.isAdmin || false;
   const { logout } = useAuth();
   const [showAdminLogin, setShowAdminLogin] = useState(false);
 

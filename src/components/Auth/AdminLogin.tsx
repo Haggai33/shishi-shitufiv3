@@ -18,7 +18,7 @@ interface FormErrors {
 }
 
 export function AdminLogin({ onClose, onSuccess }: AdminLoginProps) {
-  const { setIsAdmin } = useStore(); // שימוש ישיר ב-setIsAdmin מה-store
+  const { setUserAdminStatus } = useStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -60,20 +60,23 @@ export function AdminLogin({ onClose, onSuccess }: AdminLoginProps) {
         return;
       }
       
-      setIsAdmin(true);
+      setUserAdminStatus(true);
       toast.success('התחברת בהצלחה כמנהל!');
       onSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Admin login error:', error);
       let errorMessage = 'פרטי התחברות שגויים';
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-        errorMessage = 'פרטי התחברות שגויים או חשבון מנהל לא קיים';
-        setShowSetupInfo(true);
-      } else if (error.code === 'auth/wrong-password') {
-        errorMessage = 'סיסמה שגויה';
-      } else if (error.code === 'auth/too-many-requests') {
-        errorMessage = 'יותר מדי ניסיונות התחברות. נסה שוב מאוחר יותר';
+      if (typeof error === 'object' && error !== null && 'code' in error) {
+        const firebaseError = error as { code: string };
+        if (firebaseError.code === 'auth/user-not-found' || firebaseError.code === 'auth/invalid-credential') {
+          errorMessage = 'פרטי התחברות שגויים או חשבון מנהל לא קיים';
+          setShowSetupInfo(true);
+        } else if (firebaseError.code === 'auth/wrong-password') {
+          errorMessage = 'סיסמה שגויה';
+        } else if (firebaseError.code === 'auth/too-many-requests') {
+          errorMessage = 'יותר מדי ניסיונות התחברות. נסה שוב מאוחר יותר';
+        }
       }
       toast.error(errorMessage);
     } finally {
@@ -97,13 +100,14 @@ export function AdminLogin({ onClose, onSuccess }: AdminLoginProps) {
       // הוספת המשתמש לטבלת המנהלים במסד הנתונים
       await FirebaseService.addCurrentUserAsAdmin(displayName.trim());
       
-      setIsAdmin(true);
+      setUserAdminStatus(true);
       toast.success('נוספת בהצלחה כמנהל!');
       onSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error setting up admin:', error);
-      toast.error(error.message || 'שגיאה בהוספת המנהל');
+      const message = error instanceof Error ? error.message : 'שגיאה בהוספת המנהל';
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }

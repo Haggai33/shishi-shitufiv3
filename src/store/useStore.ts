@@ -29,7 +29,7 @@ interface StoreActions {
   // UI state actions
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
-  setIsAdmin: (isAdmin: boolean) => void;
+  setUserAdminStatus: (isAdmin: boolean) => void;
 }
 
 export const useStore = create<AppState & StoreActions>((set, get) => ({
@@ -40,7 +40,7 @@ export const useStore = create<AppState & StoreActions>((set, get) => ({
   assignments: [],
   isLoading: false,
   error: null,
-  isAdmin: false,
+  // isAdmin is now derived from user.isAdmin
 
   // User actions
   setUser: (user) => set({ user }),
@@ -58,7 +58,7 @@ export const useStore = create<AppState & StoreActions>((set, get) => ({
         name: authUser.displayName || localDetails?.name || '', // תן עדיפות לשם מ-Firebase אם קיים
         phone: localDetails?.phone || '',
         email: authUser.email || localDetails?.email || '',
-        isAdmin: get().isAdmin,
+        isAdmin: false, // Default to false, will be updated by useAuth
         createdAt: localDetails?.createdAt || Date.now(),
       };
 
@@ -147,5 +147,12 @@ export const useStore = create<AppState & StoreActions>((set, get) => ({
   // UI state actions
   setLoading: (loading) => set({ isLoading: loading }),
   setError: (error) => set({ error }),
-  setIsAdmin: (isAdmin) => set({ isAdmin })
+  setUserAdminStatus: (isAdmin) => set((state) => {
+    if (state.user) {
+      const updatedUser = { ...state.user, isAdmin };
+      saveUserToLocalStorage(updatedUser);
+      return { user: updatedUser };
+    }
+    return {};
+  }),
 }));

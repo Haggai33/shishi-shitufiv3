@@ -19,9 +19,10 @@ function App() {
     setAssignments, 
     setLoading, 
     isLoading,
-    isAdmin // קבלת isAdmin מה-store כדי להעביר לרכיבים
+    user
   } = useStore();
   
+  const isAdmin = user?.isAdmin || false;
   const { user: authUser, isLoading: isAuthLoading } = useAuth();
   
   const [currentView, setCurrentView] = useState<'events' | 'admin'>('events');
@@ -133,7 +134,7 @@ function App() {
       
       <main className="pb-8">
         {currentView === 'events' && (
-          <EventsList onCreateEvent={isAdmin ? () => setShowEventForm(true) : undefined} />
+          <EventsList />
         )}
         {currentView === 'admin' && isAdmin && <AdminPanel />}
       </main>

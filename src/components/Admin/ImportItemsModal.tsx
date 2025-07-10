@@ -27,7 +27,7 @@ interface ImportItem {
 type ImportMethod = 'excel' | 'csv' | 'text' | 'preset';
 
 export function ImportItemsModal({ event, onClose }: ImportItemsModalProps) {
-  const { menuItems } = useStore();
+  const { menuItems, addMenuItem } = useStore();
   const { user: authUser } = useAuth();
   const [activeMethod, setActiveMethod] = useState<ImportMethod>('preset');
   const [textInput, setTextInput] = useState('');
@@ -79,7 +79,7 @@ export function ImportItemsModal({ event, onClose }: ImportItemsModalProps) {
           const workbook = XLSX.read(data, { type: 'array' });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as (string | number)[][];
           const items: ImportItem[] = [];
           const startRow = jsonData[0] && typeof jsonData[0][0] === 'string' && (jsonData[0][0].includes('שם') || jsonData[0][0].includes('name')) ? 1 : 0;
           for (let i = startRow; i < jsonData.length; i++) {
@@ -93,7 +93,7 @@ export function ImportItemsModal({ event, onClose }: ImportItemsModalProps) {
             items.push({ name, category: 'main', quantity, notes, isRequired: false, selected: true });
           }
           resolve(items);
-        } catch (error) { reject(new Error('שגיאה בקריאת קובץ Excel')); }
+        } catch { reject(new Error('שגיאה בקריאת קובץ Excel')); }
       };
       reader.onerror = () => reject(new Error('שגיאה בטעינת הקובץ'));
       reader.readAsArrayBuffer(file);
@@ -117,10 +117,10 @@ export function ImportItemsModal({ event, onClose }: ImportItemsModalProps) {
               if (name.length < 2) { items.push({ name, category: 'main', quantity: 1, notes, isRequired: false, selected: false, error: 'שם הפריט חייב להכיל לפחות 2 תווים' }); continue; }
               if (quantity < 1 || quantity > 100) { items.push({ name, category: 'main', quantity: 1, notes, isRequired: false, selected: false, error: 'הכמות חייבת להיות בין 1 ל-100' }); continue; }
               items.push({ name, category: 'main', quantity, notes, isRequired: false, selected: true });
-            }
-            resolve(items);
-          } catch (error) { reject(new Error('שגיאה בעיבוד קובץ CSV')); }
-        },
+          }
+          resolve(items);
+        } catch { reject(new Error('שגיאה בעיבוד קובץ CSV')); }
+      },
         error: () => reject(new Error('שגיאה בקריאת קובץ CSV')),
         encoding: 'UTF-8'
       });
@@ -155,7 +155,7 @@ export function ImportItemsModal({ event, onClose }: ImportItemsModalProps) {
     } catch (error) { console.error('Error parsing text:', error); toast.error('שגיאה בעיבוד הטקסט'); }
   };
 
-  const handlePresetListSelect = (presetItems: any[]) => {
+  const handlePresetListSelect = (presetItems: { name: string; category: MenuCategory; quantity: number; notes?: string; isRequired: boolean; }[]) => {
     const items: ImportItem[] = presetItems.map(item => ({ name: item.name, category: item.category, quantity: item.quantity, notes: item.notes, isRequired: item.isRequired, selected: true }));
     setImportItems(items);
     setShowPreview(true);
@@ -163,7 +163,7 @@ export function ImportItemsModal({ event, onClose }: ImportItemsModalProps) {
     toast.success(`נטענו ${items.length} פריטים מהרשימה`);
   };
 
-  const updateItem = (index: number, field: keyof ImportItem, value: any) => {
+  const updateItem = (index: number, field: keyof ImportItem, value: string | number | boolean | undefined) => {
     setImportItems(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
   };
 
@@ -179,10 +179,11 @@ export function ImportItemsModal({ event, onClose }: ImportItemsModalProps) {
     setIsImporting(true);
     let successCount = 0;
     let errorCount = 0;
+    const newItemsForStore: MenuItem[] = [];
     try {
       for (const item of itemsToProcess) {
         try {
-          const menuItem: Omit<MenuItem, 'id'> = { 
+          const menuItemData: Omit<MenuItem, 'id'> = { 
             eventId: event.id, 
             name: item.name, 
             category: item.category, 
@@ -193,12 +194,19 @@ export function ImportItemsModal({ event, onClose }: ImportItemsModalProps) {
             creatorId: authUser?.uid || 'admin',
             creatorName: authUser?.displayName || 'Admin'
           };
-          const itemId = await FirebaseService.createMenuItem(menuItem);
+          const itemId = await FirebaseService.createMenuItem(menuItemData, true);
           if (itemId) {
+            newItemsForStore.push({ ...menuItemData, id: itemId });
             successCount++;
           } else { errorCount++; }
         } catch (error) { console.error(`Error importing item ${item.name}:`, error); errorCount++; }
       }
+      
+      // Update store with all new items at once
+      if (newItemsForStore.length > 0) {
+        newItemsForStore.forEach(item => addMenuItem(item));
+      }
+
       if (successCount > 0) toast.success(`יובאו בהצלחה ${successCount} פריטים`);
       if (errorCount > 0) toast.error(`${errorCount} פריטים נכשלו בייבוא`);
       if (successCount > 0) onClose();
@@ -217,8 +225,7 @@ export function ImportItemsModal({ event, onClose }: ImportItemsModalProps) {
       toast.error('יש לבחור לפחות פריט אחד לייבוא');
       return;
     }
-    const eventMenuItems = menuItems.filter(mi => mi.eventId === event.id);
-    const existingNames = new Set(eventMenuItems.map(mi => mi.name.trim().toLowerCase()));
+    const existingNames = new Set(menuItems.filter(mi => mi.eventId === event.id).map(mi => mi.name.trim().toLowerCase()));
     const duplicateItems = selectedItems.filter(item => existingNames.has(item.name.trim().toLowerCase()));
     const newItems = selectedItems.filter(item => !existingNames.has(item.name.trim().toLowerCase()));
     if (duplicateItems.length > 0) {

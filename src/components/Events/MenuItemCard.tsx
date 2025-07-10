@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { User, Clock, CheckCircle, AlertCircle, Edit, Trash2, Users, RefreshCw, Save, X, UserPlus } from 'lucide-react';
+import { Clock, CheckCircle, AlertCircle, Edit, Trash2, Save, X, UserPlus } from 'lucide-react';
 import { MenuItem } from '../../types';
 import { useStore } from '../../store/useStore';
-import { useAuth } from '../../hooks/useAuth';
 import { FirebaseService } from '../../services/firebaseService';
 import toast from 'react-hot-toast';
 
@@ -12,11 +11,11 @@ interface MenuItemCardProps {
   isLoading?: boolean;
   onAssign: () => void;
   onEdit?: () => void;
-  onCancel?: () => void;
 }
 
-export function MenuItemCard({ item, canAssign, isLoading = false, onAssign, onEdit, onCancel }: MenuItemCardProps) {
-  const { user, menuItems, assignments, updateMenuItem, deleteAssignment, deleteMenuItem, isAdmin } = useStore();
+export function MenuItemCard({ item, canAssign, isLoading = false, onAssign, onEdit }: MenuItemCardProps) {
+  const { user, menuItems, assignments, updateMenuItem, deleteAssignment, deleteMenuItem } = useStore();
+  const isAdmin = user?.isAdmin || false;
 
 
   const [isEditing, setIsEditing] = useState(false);

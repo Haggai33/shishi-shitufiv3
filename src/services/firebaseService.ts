@@ -1,12 +1,12 @@
-import { ref, push, set, onValue, off, remove, update, runTransaction } from 'firebase/database';
+import { ref, push, set, onValue, off, remove, update, get, DataSnapshot } from 'firebase/database';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { database, auth } from '../lib/firebase';
 import { ShishiEvent, MenuItem, Assignment } from '../types';
 import toast from 'react-hot-toast';
 
 // Helper function to clean undefined values from objects
-const cleanObject = (obj: any): any => {
-  const cleaned: any = {};
+const cleanObject = (obj: Record<string, unknown>): Record<string, unknown> => {
+  const cleaned: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
     if (value !== undefined && value !== null) {
       cleaned[key] = value;
@@ -48,17 +48,22 @@ export class FirebaseService {
 
       console.log('Admin user created successfully:', { uid: newUser.uid, email, displayName });
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating admin user:', error);
       
       let errorMessage = 'שגיאה ביצירת המנהל';
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = 'כתובת האימייל כבר בשימוש';
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = 'הסיסמה חלשה מדי';
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'כתובת אימייל לא תקינה';
-      } else if (error.message) {
+      if (typeof error === 'object' && error !== null && 'code' in error) {
+        const firebaseError = error as { code: string; message: string };
+        if (firebaseError.code === 'auth/email-already-in-use') {
+          errorMessage = 'כתובת האימייל כבר בשימוש';
+        } else if (firebaseError.code === 'auth/weak-password') {
+          errorMessage = 'הסיסמה חלשה מדי';
+        } else if (firebaseError.code === 'auth/invalid-email') {
+          errorMessage = 'כתובת אימייל לא תקינה';
+        } else {
+          errorMessage = firebaseError.message;
+        }
+      } else if (error instanceof Error) {
         errorMessage = error.message;
       }
       
@@ -86,9 +91,10 @@ export class FirebaseService {
 
       console.log('Current user added as admin:', { uid: currentUser.uid, displayName });
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error adding current user as admin:', error);
-      throw new Error('שגיאה בהוספת המשתמש כמנהל');
+      const message = error instanceof Error ? error.message : 'שגיאה בהוספת המשתמש כמנהל';
+      throw new Error(message);
     }
   }
 
@@ -125,14 +131,14 @@ export class FirebaseService {
     }
   }
 
-  static subscribeToAdmins(callback: (admins: any[]) => void): () => void {
+  static subscribeToAdmins(callback: (admins: { uid: string }[]) => void): () => void {
     const adminsRef = ref(database, 'admins');
-    const unsubscribe = onValue(adminsRef, (snapshot) => {
+    const unsubscribe = onValue(adminsRef, (snapshot: DataSnapshot) => {
       try {
         const data = snapshot.val();
-        const admins = data ? Object.entries(data).map(([uid, adminData]: [string, any]) => ({
+        const admins = data ? Object.entries(data).map(([uid, adminData]) => ({
           uid,
-          ...adminData
+          ...(adminData as object)
         })) : [];
         callback(admins);
       } catch (error) {
@@ -159,7 +165,7 @@ export class FirebaseService {
           reject(new Error('Timeout checking admin status'));
         }, 10000); // 10 second timeout
 
-        const onValueHandler = (snapshot: any) => {
+        const onValueHandler = (snapshot: DataSnapshot) => {
           clearTimeout(timeout);
           off(adminRef, 'value', onValueHandler);
           
@@ -279,17 +285,18 @@ export class FirebaseService {
       const eventsRef = ref(database, 'events');
       
       // Get all events first
-      const snapshot = await new Promise<any>((resolve, reject) => {
-        onValue(eventsRef, resolve, { onlyOnce: true });
+      const snapshot = await new Promise<DataSnapshot>((resolve, reject) => {
+        onValue(eventsRef, (snap) => resolve(snap), { onlyOnce: true });
         setTimeout(() => reject(new Error('Timeout')), 5000);
       });
 
       const events = snapshot.val();
       if (events) {
         const updatePromises = Object.entries(events)
-          .filter(([eventId, event]: [string, any]) => 
-            eventId !== exceptEventId && event.isActive
-          )
+          .filter(([eventId, event]) => {
+            const typedEvent = event as { isActive?: boolean };
+            return eventId !== exceptEventId && typedEvent.isActive === true;
+          })
           .map(([eventId]) => 
             update(ref(database, `events/${eventId}`), { 
               isActive: false, 
@@ -368,10 +375,11 @@ export class FirebaseService {
       
       const itemRef = ref(database, `menuItems/${itemId}`);
       
-      const updateData: any = {};
+      const updateData: { [key: string]: unknown } = {};
       
-      Object.keys(updates).forEach(key => {
-        const value = updates[key as keyof MenuItem];
+      Object.keys(updates).forEach(keyStr => {
+        const key = keyStr as keyof MenuItem;
+        const value = updates[key];
         if (value === undefined) {
           updateData[key] = null;
         } else {
@@ -440,89 +448,47 @@ export class FirebaseService {
   // Assignments
   static async createAssignment(assignment: Omit<Assignment, 'id'>): Promise<string> {
     try {
-      console.log('Creating assignment:', assignment);
-      
       const menuItemRef = ref(database, `menuItems/${assignment.menuItemId}`);
-      const assignmentsRef = ref(database, 'assignments');
       
-      const result = await runTransaction(menuItemRef, (currentMenuItem) => {
-        if (!currentMenuItem) {
-          throw new Error('פריט התפריט לא נמצא');
-        }
-        
-        if (currentMenuItem.assignedTo) {
-          if (currentMenuItem.assignedTo === assignment.userId) {
-            throw new Error('כבר יש לך שיבוץ לפריט זה');
-          } else {
-            throw new Error('מצטערים, מישהו אחר כבר הספיק לשבץ את הפריט הזה');
-          }
-        }
-        
-        return {
-          ...currentMenuItem,
-          assignedTo: assignment.userId,
-          assignedToName: assignment.userName,
-          assignedAt: assignment.assignedAt || Date.now()
-        };
-      });
-      
-      if (!result.committed) {
-        throw new Error('השיבוץ נכשל - נסה שוב');
+      // קודם כל, קרא את המצב הנוכחי של הפריט
+      const snapshot = await get(menuItemRef);
+      const currentMenuItem = snapshot.val();
+  
+      if (!currentMenuItem) {
+        throw new Error('פריט התפריט לא נמצא');
       }
-      
-      try {
-        const newAssignmentRef = push(assignmentsRef);
-        const assignmentData = {
-          id: newAssignmentRef.key!,
-          eventId: assignment.eventId,
-          menuItemId: assignment.menuItemId,
-          userId: assignment.userId,
-          userName: assignment.userName,
-          quantity: assignment.quantity,
-          status: assignment.status || 'confirmed',
-          assignedAt: assignment.assignedAt || Date.now(),
-          createdAt: Date.now(),
-          updatedAt: Date.now()
-        };
-        
-        if (assignment.userPhone) {
-          (assignmentData as any).userPhone = assignment.userPhone;
-        }
-        if (assignment.notes) {
-          (assignmentData as any).notes = assignment.notes;
-        }
-        
-        await set(newAssignmentRef, assignmentData);
-        console.log('Assignment created successfully with ID:', newAssignmentRef.key);
-        
-        return newAssignmentRef.key!;
-      } catch (assignmentError) {
-        console.error('Failed to create assignment record, rolling back menu item:', assignmentError);
-        
-        try {
-          await update(menuItemRef, {
-            assignedTo: null,
-            assignedToName: null,
-            assignedAt: null
-          });
-        } catch (rollbackError) {
-          console.error('Failed to rollback menu item assignment:', rollbackError);
-        }
-        
-        throw new Error('שגיאה ביצירת השיבוץ');
+      if (currentMenuItem.assignedTo) {
+        throw new Error('מצטערים, מישהו אחר כבר הספיק לשבץ את הפריט הזה');
       }
+  
+      // הכן את כל העדכונים שיבוצעו יחד
+      const newAssignmentRef = push(ref(database, 'assignments'));
+      const newAssignmentKey = newAssignmentRef.key!;
+      
+      const updates: { [key: string]: unknown } = {};
+  
+      // עדכון 1: שייך את הפריט למשתמש
+      updates[`/menuItems/${assignment.menuItemId}/assignedTo`] = assignment.userId;
+      updates[`/menuItems/${assignment.menuItemId}/assignedToName`] = assignment.userName;
+      updates[`/menuItems/${assignment.menuItemId}/assignedAt`] = assignment.assignedAt || Date.now();
+  
+      // עדכון 2: צור את רשומת השיבוץ
+      updates[`/assignments/${newAssignmentKey}`] = {
+        ...assignment,
+        id: newAssignmentKey,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+  
+      // בצע את שני העדכונים בפעולה אטומית אחת
+      await update(ref(database), updates);
+  
+      return newAssignmentKey;
+  
     } catch (error) {
       console.error('Error creating assignment:', error);
-      
-      if (error instanceof Error && (
-        error.message.includes('מצטערים, מישהו אחר') ||
-        error.message.includes('כבר יש לך שיבוץ') ||
-        error.message.includes('פריט התפריט לא נמצא')
-      )) {
-        throw error;
-      }
-      
-      throw new Error('שגיאה ביצירת השיבוץ');
+      // העבר את השגיאה המקורית כדי שה-UI יציג אותה
+      throw error;
     }
   }
 
@@ -532,13 +498,14 @@ export class FirebaseService {
       
       const assignmentRef = ref(database, `assignments/${assignmentId}`);
       
-      const updateData: any = {
+      const updateData: { [key: string]: unknown } = {
         updatedAt: Date.now()
       };
       
-      Object.keys(updates).forEach(key => {
+      Object.keys(updates).forEach(keyStr => {
+        const key = keyStr as keyof Assignment;
         if (key !== 'id') {
-          const value = updates[key as keyof Assignment];
+          const value = updates[key];
           if (value === undefined) {
             updateData[key] = null;
           } else {
@@ -603,7 +570,7 @@ export class FirebaseService {
   static async createPresetList(presetList: {
     name: string;
     type: 'salon' | 'participants';
-    items: any[];
+    items: unknown[];
   }): Promise<string | null> {
     try {
       const presetListsRef = ref(database, 'presetLists');
@@ -630,7 +597,7 @@ export class FirebaseService {
 
   static async updatePresetList(listId: string, updates: {
     name?: string;
-    items?: any[];
+    items?: unknown[];
   }): Promise<boolean> {
     try {
       const listRef = ref(database, `presetLists/${listId}`);
@@ -661,7 +628,7 @@ export class FirebaseService {
     }
   }
 
-  static subscribeToPresetLists(callback: (lists: any[]) => void): () => void {
+  static subscribeToPresetLists(callback: (lists: unknown[]) => void): () => void {
     const presetListsRef = ref(database, 'presetLists');
     const unsubscribe = onValue(presetListsRef, (snapshot) => {
       try {
@@ -706,7 +673,7 @@ export class FirebaseService {
   }
 
   // Helper method to check for data consistency
-  static async validateAssignmentConsistency(menuItemId: string, userId: string): Promise<{
+  static async validateAssignmentConsistency(/* _menuItemId: string, _userId: string */): Promise<{
     hasAssignment: boolean;
     hasMenuItemAssignment: boolean;
     assignment?: Assignment;

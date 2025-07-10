@@ -61,5 +61,4 @@ export interface AppState {
   assignments: Assignment[];
   isLoading: boolean;
   error: string | null;
-  isAdmin: boolean;
 }

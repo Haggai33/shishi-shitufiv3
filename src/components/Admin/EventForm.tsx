@@ -22,7 +22,8 @@ interface FormErrors {
 
 export function EventForm({ event, onClose }: EventFormProps) {
   const { user, addEvent, updateEvent } = useStore();
-  const { isAdmin, user: authUser } = useAuth();
+  const { user: authUser } = useAuth();
+  const isAdmin = user?.isAdmin || false;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   
@@ -83,7 +84,7 @@ export function EventForm({ event, onClose }: EventFormProps) {
     
     // בדיקת הרשאות מנהל
     if (!isAdmin || !authUser) {
-      toast.error('רק מנהלים יכולים ליצור אירועים');
+      toast.error('רק מנהלים יכולים ליצור ולערוך אירועים.');
       return;
     }
 
@@ -101,7 +102,7 @@ export function EventForm({ event, onClose }: EventFormProps) {
         title: formData.title.trim(),
         location: formData.location.trim(),
         hostName: formData.hostName.trim(),
-        description: formData.description.trim() || null,
+        description: formData.description.trim() || undefined,
         hostId: authUser.uid,
         updatedAt: Date.now()
       };
@@ -140,7 +141,7 @@ export function EventForm({ event, onClose }: EventFormProps) {
     }
   };
 
-  const handleInputChange = (field: keyof typeof formData, value: any) => {
+  const handleInputChange = (field: keyof typeof formData, value: string | number | boolean | undefined) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
     if (errors[field as keyof FormErrors]) {
