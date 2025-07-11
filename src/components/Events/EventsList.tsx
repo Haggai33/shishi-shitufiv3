@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Calendar, Clock, MapPin, ChefHat, Search } from 'lucide-react';
+import { Plus, Calendar, Clock, MapPin, ChefHat, Search, X } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { EventDetails } from './EventDetails';
 import { AssignmentModal } from './AssignmentModal';
@@ -226,8 +226,17 @@ export function EventsList() {
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                           placeholder="חפש פריט לפי שם..."
-                          className="w-full pr-10 pl-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+                          className="w-full pr-10 pl-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
                       />
+                      {searchTerm && (
+                        <button
+                          onClick={() => setSearchTerm('')}
+                          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                          aria-label="נקה חיפוש"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
                   </div>
               </div>
               <div>

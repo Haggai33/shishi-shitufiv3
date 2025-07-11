@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { User as AuthUser } from 'firebase/auth';
-import { User, ShishiEvent, MenuItem, Assignment, AppState } from '../types';
+import { User, ShishiEvent, MenuItem, Assignment, AppState, Unsubscribe } from '../types';
 import { saveUserToLocalStorage, getUserFromLocalStorage } from '../utils/userUtils';
 
 interface StoreActions {
@@ -30,6 +30,10 @@ interface StoreActions {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setUserAdminStatus: (isAdmin: boolean) => void;
+
+  // Listener management
+  setListenerUnsubscribers: (unsubscribers: Unsubscribe[]) => void;
+  clearAndUnsubscribeListeners: () => void;
 }
 
 export const useStore = create<AppState & StoreActions>((set, get) => ({
@@ -40,6 +44,7 @@ export const useStore = create<AppState & StoreActions>((set, get) => ({
   assignments: [],
   isLoading: false,
   error: null,
+  listenerUnsubscribers: [],
   // isAdmin is now derived from user.isAdmin
 
   // User actions
@@ -155,4 +160,15 @@ export const useStore = create<AppState & StoreActions>((set, get) => ({
     }
     return {};
   }),
+
+  // Listener management
+  setListenerUnsubscribers: (unsubscribers) => set({ listenerUnsubscribers: unsubscribers }),
+  clearAndUnsubscribeListeners: () => {
+    const unsubscribers = get().listenerUnsubscribers;
+    if (unsubscribers.length > 0) {
+      console.log(`Cleaning up ${unsubscribers.length} Firebase listeners.`);
+      unsubscribers.forEach(unsubscribe => unsubscribe());
+      set({ listenerUnsubscribers: [] });
+    }
+  },
 }));

@@ -1,6 +1,7 @@
 import { ref, push, set, onValue, off, remove, update, get, DataSnapshot } from 'firebase/database';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { database, auth } from '../lib/firebase';
+import { isCurrentlyLoggingOut } from '../hooks/useAuth';
 import { ShishiEvent, MenuItem, Assignment } from '../types';
 import toast from 'react-hot-toast';
 
@@ -329,8 +330,12 @@ export class FirebaseService {
         callback([]);
       }
     }, (error) => {
-      console.error('Error subscribing to events:', error);
-      toast.error('שגיאה בחיבור לשרת האירועים');
+      if (isCurrentlyLoggingOut) {
+        console.log('Events listener canceled during logout as expected.');
+      } else {
+        console.error('Error subscribing to events:', error);
+        toast.error('שגיאה בחיבור לשרת האירועים');
+      }
     });
 
     return () => off(eventsRef, 'value', unsubscribe);
@@ -438,8 +443,12 @@ export class FirebaseService {
         callback([]);
       }
     }, (error) => {
-      console.error('Error subscribing to menu items:', error);
-      toast.error('שגיאה בחיבור לשרת התפריט');
+      if (isCurrentlyLoggingOut) {
+        console.log('Menu items listener canceled during logout as expected.');
+      } else {
+        console.error('Error subscribing to menu items:', error);
+        toast.error('שגיאה בחיבור לשרת התפריט');
+      }
     });
 
     return () => off(menuItemsRef, 'value', unsubscribe);
@@ -556,8 +565,12 @@ export class FirebaseService {
         callback([]);
       }
     }, (error) => {
-      console.error('Error subscribing to assignments:', error);
-      toast.error('שגיאה בחיבור לשרת השיבוצים');
+      if (isCurrentlyLoggingOut) {
+        console.log('Assignments listener canceled during logout as expected.');
+      } else {
+        console.error('Error subscribing to assignments:', error);
+        toast.error('שגיאה בחיבור לשרת השיבוצים');
+      }
     });
 
     return () => {

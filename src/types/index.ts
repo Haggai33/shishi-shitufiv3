@@ -54,6 +54,8 @@ export interface Assignment {
 
 export type MenuCategory = 'starter' | 'main' | 'dessert' | 'drink' | 'other';
 
+export type Unsubscribe = () => void;
+
 export interface AppState {
   user: User | null;
   events: ShishiEvent[];
@@ -61,4 +63,5 @@ export interface AppState {
   assignments: Assignment[];
   isLoading: boolean;
   error: string | null;
+  listenerUnsubscribers: Unsubscribe[];
 }

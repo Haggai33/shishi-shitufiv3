@@ -19,7 +19,9 @@ function App() {
     setAssignments, 
     setLoading, 
     isLoading,
-    user
+    user,
+    setListenerUnsubscribers,
+    clearAndUnsubscribeListeners
   } = useStore();
   
   const isAdmin = user?.isAdmin || false;
@@ -50,7 +52,9 @@ function App() {
   // Effect 2: Sets up Firebase Listeners ONCE user is authenticated
   useEffect(() => {
     if (!authUser) {
-      return; // Don't set up listeners until user is authenticated
+      // On logout or initial load before auth, ensure any previous listeners are cleared.
+      clearAndUnsubscribeListeners();
+      return;
     }
 
     console.log('Setting up Firebase listeners for user:', authUser.uid);
@@ -64,21 +68,26 @@ function App() {
         setLoading(false); // End loading only after initial data has arrived
       });
       
+      // Store the unsubscribe functions in the global state
+      setListenerUnsubscribers([
+        unsubscribeEvents,
+        unsubscribeMenuItems,
+        unsubscribeAssignments,
+      ]);
+      
       console.log('Firebase listeners set up successfully');
 
-      // Cleanup function
+      // The main cleanup is now handled by clearAndUnsubscribeListeners,
+      // but this return is still good practice for when the component unmounts entirely.
       return () => {
-        console.log('Cleaning up Firebase listeners on user change or unmount');
-        unsubscribeEvents();
-        unsubscribeMenuItems();
-        unsubscribeAssignments();
+        clearAndUnsubscribeListeners();
       };
     } catch (error) {
       console.error('Error setting up listeners:', error);
       setInitializationError('שגיאה בטעינת הנתונים.');
       setLoading(false);
     }
-  }, [authUser, setEvents, setMenuItems, setAssignments, setLoading]);
+  }, [authUser, setEvents, setMenuItems, setAssignments, setLoading, setListenerUnsubscribers, clearAndUnsubscribeListeners]);
 
   // Effect 3: Timeout for loading state
   useEffect(() => {

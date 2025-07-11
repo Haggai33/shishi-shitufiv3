@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import toast from 'react-hot-toast';
 import { auth } from '../lib/firebase';
 import { useStore } from '../store/useStore';
 import { FirebaseService } from '../services/firebaseService';
 
+// Global flag to handle logout race condition.
+// This is a simple, effective way to manage state during the async logout process.
+export let isCurrentlyLoggingOut = false;
+
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { setUserAdminStatus } = useStore();
+  const { setUserAdminStatus, clearAndUnsubscribeListeners } = useStore();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -23,22 +28,31 @@ export function useAuth() {
           setUserAdminStatus(false); // Default to false on any error
         }
       } else {
-        // If the user is logged out, reset the admin status
+        // If the user is logged out, ensure admin status is reset and listeners are cleared
         setUserAdminStatus(false);
+        clearAndUnsubscribeListeners();
       }
       
       setIsLoading(false);
     });
 
     return unsubscribe;
-  }, [setUserAdminStatus]);
+  }, [setUserAdminStatus, clearAndUnsubscribeListeners]);
 
   const logout = async () => {
+    isCurrentlyLoggingOut = true;
     try {
+      clearAndUnsubscribeListeners();
       await signOut(auth);
-      // onAuthStateChanged יטפל באיפוס המצב אוטומטית
+      toast.success('התנתקת בהצלחה');
     } catch (error) {
       console.error('Error signing out:', error);
+      toast.error('שגיאה בעת ההתנתקות');
+    } finally {
+      // Reset the flag after a short delay to ensure all onCancel callbacks have fired.
+      setTimeout(() => {
+        isCurrentlyLoggingOut = false;
+      }, 500);
     }
   };
 
