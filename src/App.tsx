@@ -42,26 +42,33 @@ function App() {
       signInAnonymously(auth).catch(err => {
         console.error("Anonymous sign-in failed:", err);
         setInitializationError("שגיאה בהתחברות למערכת. אנא רענן את הדף.");
+        setLoading(false);
       });
     }
   }, [isAuthLoading, authUser, initializeUser, setLoading]);
 
-  // Effect 2: Sets up Firebase Listeners ONCE
+  // Effect 2: Sets up Firebase Listeners ONCE user is authenticated
   useEffect(() => {
-    console.log('Setting up Firebase listeners...');
-    setLoading(true); // התחל טעינה לפני הקמת המאזינים
+    if (!authUser) {
+      return; // Don't set up listeners until user is authenticated
+    }
+
+    console.log('Setting up Firebase listeners for user:', authUser.uid);
+    setLoading(true); // Start loading before setting up listeners
+    
     try {
       const unsubscribeEvents = FirebaseService.subscribeToEvents(setEvents);
       const unsubscribeMenuItems = FirebaseService.subscribeToMenuItems(setMenuItems);
       const unsubscribeAssignments = FirebaseService.subscribeToAssignments((data) => {
         setAssignments(data);
-        setLoading(false); // סיים טעינה רק אחרי שכל המידע הראשוני הגיע
+        setLoading(false); // End loading only after initial data has arrived
       });
       
       console.log('Firebase listeners set up successfully');
 
+      // Cleanup function
       return () => {
-        console.log('Cleaning up Firebase listeners on app unmount');
+        console.log('Cleaning up Firebase listeners on user change or unmount');
         unsubscribeEvents();
         unsubscribeMenuItems();
         unsubscribeAssignments();
@@ -71,7 +78,7 @@ function App() {
       setInitializationError('שגיאה בטעינת הנתונים.');
       setLoading(false);
     }
-  }, [setEvents, setMenuItems, setAssignments, setLoading]);
+  }, [authUser, setEvents, setMenuItems, setAssignments, setLoading]);
 
   // Effect 3: Timeout for loading state
   useEffect(() => {
