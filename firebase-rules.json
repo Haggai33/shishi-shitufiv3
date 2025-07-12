@@ -7,24 +7,22 @@
     "menuItems": {
       ".read": "auth != null",
       "$itemId": {
-        ".write": 
+        // כלל כתיבה משופר עבור פריט תפריט ספציפי
+        ".write":
           // 1. מנהל יכול לעשות הכל
-          "root.child('admins').child(auth.uid).exists() || " +
+          "root.child('admins').child(auth.uid).exists() ||
           
           // 2. משתמש יכול ליצור פריט חדש אם הוא מוגדר כיוצר
-          "(newData.exists() && !data.exists() && newData.child('creatorId').val() === auth.uid) || " +
+          (newData.exists() && !data.exists() && newData.child('creatorId').val() === auth.uid) ||
           
-          // 3. היוצר יכול למחוק את הפריט שיצר (אם הוא לא משובץ, או משובץ לעצמו)
-          "(data.exists() && !newData.exists() && data.child('creatorId').val() === auth.uid && (!data.child('assignedTo').exists() || data.child('assignedTo').val() === auth.uid)) || " +
+          // 3. היוצר יכול למחוק את הפריט שיצר, רק אם הוא לא משובץ
+          (data.exists() && !newData.exists() && data.child('creatorId').val() === auth.uid && data.child('assignedTo').val() == null) ||
           
-          // 4. כל משתמש מחובר יכול לשבץ את עצמו לפריט פנוי
-          "(data.exists() && newData.exists() && !data.child('assignedTo').exists() && newData.child('assignedTo').val() === auth.uid) || " +
+          // 4. ***החלק החדש והחשוב***: כל משתמש מחובר יכול לשבץ את עצמו לפריט פנוי
+          (data.exists() && newData.exists() && data.child('assignedTo').val() == null && newData.child('assignedTo').val() === auth.uid) ||
 
-          // 5. משתמש ששובץ יכול לבטל את השיבוץ של עצמו
-          "(data.exists() && newData.exists() && data.child('assignedTo').val() === auth.uid && !newData.child('assignedTo').exists()) || " +
-          
-          // 6. היוצר יכול לערוך את הפריט (אם הוא לא משובץ, או משובץ לעצמו)
-          "(data.exists() && newData.exists() && data.child('creatorId').val() === auth.uid && (!data.child('assignedTo').exists() || data.child('assignedTo').val() === auth.uid))"
+          // 5. ***החלק החדש והחשוב***: משתמש ששובץ יכול לבטל את השיבוץ של עצמו
+          (data.exists() && newData.exists() && data.child('assignedTo').val() === auth.uid && newData.child('assignedTo').val() == null)"
       }
     },
     "assignments": {
