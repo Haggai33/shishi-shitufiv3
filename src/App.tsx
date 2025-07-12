@@ -17,6 +17,7 @@ function App() {
     setEvents, 
     setMenuItems, 
     setAssignments, 
+    setUsers,
     setLoading, 
     isLoading,
     user,
@@ -63,6 +64,7 @@ function App() {
     try {
       const unsubscribeEvents = FirebaseService.subscribeToEvents(setEvents);
       const unsubscribeMenuItems = FirebaseService.subscribeToMenuItems(setMenuItems);
+      const unsubscribeUsers = FirebaseService.subscribeToUsers(setUsers);
       const unsubscribeAssignments = FirebaseService.subscribeToAssignments((data) => {
         setAssignments(data);
         setLoading(false); // End loading only after initial data has arrived
@@ -73,6 +75,7 @@ function App() {
         unsubscribeEvents,
         unsubscribeMenuItems,
         unsubscribeAssignments,
+        unsubscribeUsers,
       ]);
       
       console.log('Firebase listeners set up successfully');

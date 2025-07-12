@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Calendar, Clock, MapPin, ChefHat, Search, X } from 'lucide-react';
+import { Plus, Calendar, Clock, MapPin, ChefHat, Search, X, ArrowRight } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import { EventDetails } from './EventDetails';
 import { AssignmentModal } from './AssignmentModal';
 import { EditAssignmentModal } from './EditAssignmentModal';
 import { MenuItemCard } from './MenuItemCard';
@@ -9,34 +8,29 @@ import { MenuItem, Assignment } from '../../types';
 import { formatDate, formatTime, isEventPast } from '../../utils/dateUtils';
 import { BulkItemsManager } from '../Admin/BulkItemsManager';
 import { UserMenuItemForm } from './UserMenuItemForm';
+import { CategorySelector } from './CategorySelector';
 
-// קומפוננטה לכפתורי הסינון
-const FilterButton = ({ label, count, isActive, onClick }: { label: string, count: number, isActive: boolean, onClick: () => void }) => (
-  <button
-    onClick={onClick}
-    className={`px-3 py-1 text-xs font-medium rounded-full transition-colors whitespace-nowrap ${
-      isActive
-        ? 'bg-orange-500 text-white shadow'
-        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-    }`}
-  >
-    {label} ({count})
-  </button>
-);
+const categoryNames: { [key: string]: string } = {
+  starter: 'מנות ראשונות',
+  main: 'מנות עיקריות',
+  dessert: 'קינוחים',
+  drink: 'משקאות',
+  other: 'אחר',
+};
 
 export function EventsList() {
-  const { events, menuItems, assignments, isLoading, user } = useStore();
+  const { events, menuItems, assignments, isLoading, user, users } = useStore();
   const isAdmin = user?.isAdmin || false;
 
-  const [showEventDetails, setShowEventDetails] = useState(false);
   const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null);
   const [editingAssignment, setEditingAssignment] = useState<{ item: MenuItem; assignment: Assignment } | null>(null);
-  const [statusFilter, setStatusFilter] = useState<'available' | 'my-assignments' | 'assigned' | 'all'>('available');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
-  
   const [showBulkManager, setShowBulkManager] = useState(false);
   const [showUserItemForm, setShowUserItemForm] = useState(false);
+
+  // New state to manage the view
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [showMyAssignments, setShowMyAssignments] = useState(false);
 
   const activeEvent = useMemo(() => {
     const activeEvents = events.filter(event => {
@@ -77,86 +71,47 @@ export function EventsList() {
     [assignments, activeEvent]
   );
 
-  const assignedItems = useMemo(() => 
+  const assignedItems = useMemo(() =>
     eventMenuItems.filter(item => {
-      return assignments.some(a => a.menuItemId === item.id);
+      return eventAssignments.some(a => a.menuItemId === item.id);
     }),
-    [eventMenuItems, assignments]
+    [eventMenuItems, eventAssignments]
   );
 
-  const categoryNames = {
-    starter: 'מנות ראשונות',
-    main: 'מנות עיקריות', 
-    dessert: 'קינוחים',
-    drink: 'משקאות',
-    other: 'אחר'
-  };
-
-  const filteredItems = useMemo(() => {
+  const displayedItems = useMemo(() => {
     let items = eventMenuItems;
 
     if (searchTerm.trim()) {
-        items = items.filter(item => 
-            item.name.toLowerCase().includes(searchTerm.trim().toLowerCase())
-        );
+      return items.filter(item =>
+        item.name.toLowerCase().includes(searchTerm.trim().toLowerCase())
+      );
     }
 
-    if (categoryFilter !== 'all') {
-      items = items.filter(item => item.category === categoryFilter);
+    if (showMyAssignments) {
+      return items.filter(item =>
+        eventAssignments.some(a => a.menuItemId === item.id && a.userId === user?.id)
+      );
     }
 
-    switch (statusFilter) {
-      case 'available':
-        items = items.filter(item => !assignments.some(a => a.menuItemId === item.id));
-        break;
-      case 'assigned':
-        items = items.filter(item => assignments.some(a => a.menuItemId === item.id));
-        break;
-      case 'my-assignments':
-        items = items.filter(item => assignments.some(a => a.menuItemId === item.id && a.userId === user?.id));
-        break;
-      case 'all':
-      default:
-        break;
+    if (selectedCategory) {
+      return items.filter(item => item.category === selectedCategory);
     }
 
-    return items;
-  }, [eventMenuItems, categoryFilter, statusFilter, user?.id, assignments, searchTerm]);
+    return [];
+  }, [eventMenuItems, searchTerm, selectedCategory, showMyAssignments, eventAssignments, user?.id]);
 
-  const filterCounts = useMemo(() => {
-    const assignedItemIds = new Set(assignments.map(a => a.menuItemId));
-    const myAssignedItemIds = new Set(assignments.filter(a => a.userId === user?.id).map(a => a.menuItemId));
-
-    const status = {
-      available: eventMenuItems.filter(item => !assignedItemIds.has(item.id)).length,
-      myAssignments: eventMenuItems.filter(item => myAssignedItemIds.has(item.id)).length,
-      assigned: eventMenuItems.filter(item => assignedItemIds.has(item.id)).length,
-      all: eventMenuItems.length,
-    };
-
-    const categories = {
-      all: eventMenuItems.length,
-      starter: eventMenuItems.filter(item => item.category === 'starter').length,
-      main: eventMenuItems.filter(item => item.category === 'main').length,
-      dessert: eventMenuItems.filter(item => item.category === 'dessert').length,
-      drink: eventMenuItems.filter(item => item.category === 'drink').length,
-      other: eventMenuItems.filter(item => item.category === 'other').length
-    };
-
-    return { status, categories };
-  }, [eventMenuItems, assignments, user?.id]);
-  
-  const statusOptions: { value: 'available' | 'my-assignments' | 'assigned' | 'all', label: string }[] = [
-      { value: 'available', label: 'זמינים' },
-      { value: 'my-assignments', label: 'שלי' },
-      { value: 'assigned', label: 'משובצים' },
-      { value: 'all', label: 'הכל' }
-  ];
-  
-  const categoryOptions = [
-      { value: 'all', label: 'כל הקטגוריות' },
-      ...Object.entries(categoryNames).map(([key, name]) => ({ value: key, label: name }))
-  ];
+  const itemsToRender = useMemo(() => {
+    if (searchTerm.trim() || showMyAssignments || selectedCategory) {
+      const assigned = displayedItems.filter(item =>
+        eventAssignments.some(a => a.menuItemId === item.id)
+      );
+      const available = displayedItems.filter(item =>
+        !eventAssignments.some(a => a.menuItemId === item.id)
+      );
+      return { assigned, available };
+    }
+    return { assigned: [], available: [] };
+  }, [displayedItems, eventAssignments, searchTerm, showMyAssignments, selectedCategory]);
 
   const canAssign = activeEvent && !isEventPast(activeEvent.date, activeEvent.time) && activeEvent.isActive;
 
@@ -175,10 +130,6 @@ export function EventsList() {
   
   if (showBulkManager) {
     return <BulkItemsManager onBack={() => setShowBulkManager(false)} />;
-  }
-  
-  if (showEventDetails && activeEvent) {
-    return <EventDetails event={activeEvent} onBack={() => setShowEventDetails(false)} />;
   }
 
   return (
@@ -215,75 +166,98 @@ export function EventsList() {
             </div>
           </div>
           
-          {eventMenuItems.length > 0 && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-4 space-y-3">
-              <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-2">חיפוש מהיר</label>
-                  <div className="relative">
-                      <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                      <input
-                          type="text"
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          placeholder="חפש פריט לפי שם..."
-                          className="w-full pr-10 pl-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
-                      />
-                      {searchTerm && (
-                        <button
-                          onClick={() => setSearchTerm('')}
-                          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                          aria-label="נקה חיפוש"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      )}
-                  </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">סינון לפי סטטוס</label>
-                <div className="flex gap-2 overflow-x-auto pb-2">
-                  {statusOptions.map(option => (<FilterButton key={option.value} label={option.label} count={filterCounts.status[option.value as keyof typeof filterCounts.status]} isActive={statusFilter === option.value} onClick={() => setStatusFilter(option.value)}/>))}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-4 space-y-3">
+            <div>
+                <label className="block text-xs font-medium text-gray-700 mb-2">חיפוש מהיר</label>
+                <div className="relative">
+                    <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                    <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="חפש פריט לפי שם..."
+                        className="w-full pr-10 pl-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+                    />
+                    {searchTerm && (
+                      <button
+                        onClick={() => setSearchTerm('')}
+                        className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                        aria-label="נקה חיפוש"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
                 </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">סינון לפי קטגוריה</label>
-                <div className="flex gap-2 overflow-x-auto pb-2">
-                  {categoryOptions.map(option => {
-                    const count = filterCounts.categories[option.value as keyof typeof filterCounts.categories];
-                    if (count === 0 && option.value !== 'all') return null;
-                    return (<FilterButton key={option.value} label={option.label} count={count} isActive={categoryFilter === option.value} onClick={() => setCategoryFilter(option.value)}/>)
-                  })}
-                </div>
-              </div>
             </div>
-          )}
+          </div>
 
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center">
-                  <ChefHat className="h-5 w-5 ml-2 text-orange-500" />
-                  <h2 className="text-lg font-semibold text-gray-900">
-                      פריטים לשיבוץ
-                      {filteredItems.length > 0 && (<span className="text-gray-500 text-sm mr-2">({assignments.filter(a => filteredItems.some(fi => fi.id === a.menuItemId)).length}/{filteredItems.length} משובצים)</span>)}
-                  </h2>
-              </div>
-              {!isAdmin && canAssign && (
-                <button onClick={() => setShowUserItemForm(true)} disabled={!canAddMoreItems} title={canAddMoreItems ? "הוסף פריט חדש" : `הגעת למכסת ${MAX_USER_ITEMS} הפריטים`} className="flex items-center space-x-2 rtl:space-x-reverse px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed">
-                  <Plus className="h-4 w-4" />
-                  <span>הוסף פריט משלך</span>
-                </button>
-              )}
-            </div>
-
-            {filteredItems.length === 0 ? (
-              <div className="text-center py-8">
-                <div className="bg-gray-100 rounded-full h-12 w-12 flex items-center justify-center mx-auto mb-4"><ChefHat className="h-6 w-6 text-gray-400" /></div>
-                <h3 className="text-base font-medium text-gray-900 mb-2">אין פריטים התואמים לסינון</h3>
-                <p className="text-sm text-gray-500">נסה לשנות את אפשרויות הסינון או החיפוש</p>
-              </div>
+            {searchTerm.trim() === '' && !selectedCategory && !showMyAssignments ? (
+              <CategorySelector
+                menuItems={eventMenuItems}
+                assignments={eventAssignments}
+                onSelectCategory={(category) => {
+                  setSelectedCategory(category);
+                  setShowMyAssignments(false);
+                }}
+                onShowMyAssignments={() => {
+                  setShowMyAssignments(true);
+                  setSelectedCategory(null);
+                }}
+                onAddItem={() => setShowUserItemForm(true)}
+                canAddMoreItems={canAddMoreItems}
+              />
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {filteredItems.map((item) => (<MenuItemCard key={item.id} item={item} canAssign={!!canAssign} onAssign={() => handleAssignItem(item)} onEdit={() => handleEditAssignment(item)}/>))}
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <button
+                    onClick={() => {
+                      setSelectedCategory(null);
+                      setShowMyAssignments(false);
+                      setSearchTerm('');
+                    }}
+                    className="flex items-center text-sm font-semibold text-orange-600 hover:text-orange-800 transition-colors"
+                  >
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                    {showMyAssignments ? 'חזור לקטגוריות' : selectedCategory ? 'חזור לקטגוריות' : 'חזרה'}
+                  </button>
+                  <h2 className="text-lg font-bold text-gray-800">
+                    {showMyAssignments ? 'השיבוצים שלי' : selectedCategory ? categoryNames[selectedCategory] : 'תוצאות חיפוש'}
+                  </h2>
+                </div>
+
+                {itemsToRender.available.length === 0 && itemsToRender.assigned.length === 0 ? (
+                  <div className="text-center py-8">
+                    <ChefHat className="h-12 w-12 mx-auto text-gray-300" />
+                    <h3 className="mt-2 text-sm font-medium text-gray-900">
+                      {showMyAssignments ? 'עדיין לא שובצת לפריטים' : 'אין פריטים בקטגוריה זו'}
+                    </h3>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {itemsToRender.available.length > 0 && (
+                      <div>
+                        <h3 className="text-md font-semibold text-gray-700 mb-3">פריטים פנויים</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {itemsToRender.available.map((item) => (
+                            <MenuItemCard key={item.id} item={item} canAssign={!!canAssign} onAssign={() => handleAssignItem(item)} onEdit={() => handleEditAssignment(item)} onAssignmentCancelled={() => { setSelectedCategory(null); setShowMyAssignments(false); }} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {itemsToRender.assigned.length > 0 && (
+                      <div>
+                        <h3 className="text-md font-semibold text-gray-700 mb-3 border-t pt-4 mt-4">פריטים ששובצו</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {itemsToRender.assigned.map((item) => (
+                            <MenuItemCard key={item.id} item={item} canAssign={!!canAssign} onAssign={() => handleAssignItem(item)} onEdit={() => handleEditAssignment(item)} assignedTo={eventAssignments.find(a => a.menuItemId === item.id)?.userId} allUsers={users} onAssignmentCancelled={() => { setSelectedCategory(null); setShowMyAssignments(false); }} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -58,6 +58,7 @@ export type Unsubscribe = () => void;
 
 export interface AppState {
   user: User | null;
+  users: User[];
   events: ShishiEvent[];
   menuItems: MenuItem[];
   assignments: Assignment[];

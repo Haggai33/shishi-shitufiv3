@@ -7,22 +7,8 @@
     "menuItems": {
       ".read": "auth != null",
       "$itemId": {
-        // כלל כתיבה משופר עבור פריט תפריט ספציפי
         ".write":
-          // 1. מנהל יכול לעשות הכל
-          "root.child('admins').child(auth.uid).exists() ||
-          
-          // 2. משתמש יכול ליצור פריט חדש אם הוא מוגדר כיוצר
-          (newData.exists() && !data.exists() && newData.child('creatorId').val() === auth.uid) ||
-          
-          // 3. היוצר יכול למחוק את הפריט שיצר, רק אם הוא לא משובץ
-          (data.exists() && !newData.exists() && data.child('creatorId').val() === auth.uid && data.child('assignedTo').val() == null) ||
-          
-          // 4. ***החלק החדש והחשוב***: כל משתמש מחובר יכול לשבץ את עצמו לפריט פנוי
-          (data.exists() && newData.exists() && data.child('assignedTo').val() == null && newData.child('assignedTo').val() === auth.uid) ||
-
-          // 5. ***החלק החדש והחשוב***: משתמש ששובץ יכול לבטל את השיבוץ של עצמו
-          (data.exists() && newData.exists() && data.child('assignedTo').val() === auth.uid && newData.child('assignedTo').val() == null)"
+          "root.child('admins').child(auth.uid).exists() || (newData.exists() && !data.exists() && newData.child('creatorId').val() === auth.uid) || (data.exists() && !newData.exists() && data.child('creatorId').val() === auth.uid && data.child('assignedTo').val() == null) || (data.exists() && newData.exists() && data.child('assignedTo').val() == null && newData.child('assignedTo').val() === auth.uid) || (data.exists() && newData.exists() && data.child('assignedTo').val() === auth.uid && newData.child('assignedTo').val() == null)"
       }
     },
     "assignments": {
@@ -43,6 +29,12 @@
     "presetLists": {
       ".read": "auth != null",
       ".write": "root.child('admins').child(auth.uid).exists()"
+    },
+    "users": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid"
+      }
     }
   }
 }

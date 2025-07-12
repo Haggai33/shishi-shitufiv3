@@ -5,3 +5,49 @@
 html, body {
   overflow-x: hidden;
 }
+
+/* Glassmorphism Card Style */
+.category-card-2025 {
+  background: white;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.category-card-2025:hover {
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  transform: translateY(-5px);
+}
+
+/* Aurora Glow Effect */
+.aurora-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.category-card-2025:hover .aurora-glow {
+  opacity: 0.2;
+}
+
+.glow-main {
+  background-image: radial-gradient(circle at 50% 0%, #ff8a00, transparent 70%);
+}
+.glow-starter {
+  background-image: radial-gradient(circle at 50% 0%, #3498db, transparent 70%);
+}
+.glow-dessert {
+  background-image: radial-gradient(circle at 50% 0%, #9b59b6, transparent 70%);
+}
+.glow-drink {
+  background-image: radial-gradient(circle at 50% 0%, #2ecc71, transparent 70%);
+}
+.glow-other {
+  background-image: radial-gradient(circle at 50% 0%, #95a5a6, transparent 70%);
+}

@@ -2,7 +2,7 @@ import { ref, push, set, onValue, off, remove, update, get, DataSnapshot } from 
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { database, auth } from '../lib/firebase';
 import { isCurrentlyLoggingOut } from '../hooks/useAuth';
-import { ShishiEvent, MenuItem, Assignment } from '../types';
+import { ShishiEvent, MenuItem, Assignment, User } from '../types';
 import toast from 'react-hot-toast';
 
 // Helper function to clean undefined values from objects
@@ -130,6 +130,26 @@ export class FirebaseService {
       console.error('Error updating admin user:', error);
       throw new Error('שגיאה בעדכון המנהל');
     }
+  }
+
+  static subscribeToUsers(callback: (users: User[]) => void): () => void {
+    const usersRef = ref(database, 'users');
+    const unsubscribe = onValue(usersRef, (snapshot: DataSnapshot) => {
+      try {
+        const data = snapshot.val();
+        const users: User[] = data ? Object.values(data) : [];
+        callback(users);
+      } catch (error) {
+        console.error('Error processing users data:', error);
+        toast.error('שגיאה בטעינת רשימת המשתמשים');
+        callback([]);
+      }
+    }, (error) => {
+      console.error('Error subscribing to users:', error);
+      toast.error('שגיאה בחיבור לשרת המשתמשים');
+    });
+
+    return () => off(usersRef, 'value', unsubscribe);
   }
 
   static subscribeToAdmins(callback: (admins: { uid: string }[]) => void): () => void {

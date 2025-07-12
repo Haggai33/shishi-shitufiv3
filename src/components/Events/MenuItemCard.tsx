@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Clock, CheckCircle, AlertCircle, Edit, Trash2, Save, X, UserPlus } from 'lucide-react';
-import { MenuItem } from '../../types';
+import { MenuItem, User } from '../../types';
 import { useStore } from '../../store/useStore';
 import { FirebaseService } from '../../services/firebaseService';
 import toast from 'react-hot-toast';
@@ -11,12 +11,14 @@ interface MenuItemCardProps {
   isLoading?: boolean;
   onAssign: () => void;
   onEdit?: () => void;
+  assignedTo?: string;
+  allUsers?: User[];
+  onAssignmentCancelled?: () => void;
 }
 
-export function MenuItemCard({ item, canAssign, isLoading = false, onAssign, onEdit }: MenuItemCardProps) {
-  const { user, menuItems, assignments, updateMenuItem, deleteAssignment, deleteMenuItem } = useStore();
+export function MenuItemCard({ item, canAssign, isLoading = false, onAssign, onEdit, assignedTo, allUsers = [], onAssignmentCancelled }: MenuItemCardProps) {
+  const { user, assignments, updateMenuItem, deleteAssignment, deleteMenuItem } = useStore();
   const isAdmin = user?.isAdmin || false;
-
 
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(item.name);
@@ -43,27 +45,14 @@ export function MenuItemCard({ item, canAssign, isLoading = false, onAssign, onE
     other: 'אחר'
   };
 
-  const isAssigned = !!item.assignedTo;
-  const isMyAssignment = isAssigned && item.assignedTo === user?.id;
+  const isAssigned = !!assignedTo;
+  const assignedUser = isAssigned ? allUsers.find(u => u.id === assignedTo) : undefined;
+  const isMyAssignment = isAssigned && assignedTo === user?.id;
   const isCreator = user?.id === item.creatorId;
   const canControlItem = isAdmin || (isCreator && !isAssigned);
 
   const itemAssignments = assignments.filter(a => a.menuItemId === item.id);
   const hasMultipleAssignments = itemAssignments.length > 1;
-
-  const allEventMenuItems = menuItems.filter(mi => mi.eventId === item.eventId);
-  const currentlyAssignedItems = allEventMenuItems.filter(mi => !!mi.assignedTo && !!mi.assignedToName);
-
-  const allUsers = currentlyAssignedItems.reduce((users, assignedItem) => {
-    const key = `${assignedItem.assignedTo!}|${assignedItem.assignedToName!}`;
-    if (!users.some(u => `${u.userId}|${u.userName}` === key)) {
-      users.push({
-        userId: assignedItem.assignedTo!,
-        userName: assignedItem.assignedToName!
-      });
-    }
-    return users;
-  }, [] as { userId: string; userName: string }[]);
 
   const handleSaveEdit = async () => {
     if (!editedName.trim()) {
@@ -141,6 +130,9 @@ export function MenuItemCard({ item, canAssign, isLoading = false, onAssign, onE
       await FirebaseService.updateMenuItem(item.id, menuItemUpdates);
       updateMenuItem(item.id, menuItemUpdates);
       toast.success('השיבוץ בוטל בהצלחה!');
+      if (onAssignmentCancelled) {
+        onAssignmentCancelled();
+      }
     } catch (error) {
       console.error('Error canceling assignment:', error);
       toast.error('שגיאה בביטול השיבוץ.');
@@ -149,7 +141,6 @@ export function MenuItemCard({ item, canAssign, isLoading = false, onAssign, onE
     }
   };
 
-  // *** התיקון נמצא כאן ***
   const handleAdminCancelAssignment = async () => {
     if (!isAdmin || !item.assignedTo) return;
     if (!confirm(`האם אתה בטוח שברצונך לבטל את השיבוץ של "${item.assignedToName}" מהפריט "${item.name}"?`)) {
@@ -157,29 +148,26 @@ export function MenuItemCard({ item, canAssign, isLoading = false, onAssign, onE
     }
     setIsCanceling(true);
     try {
-      // Find the corresponding assignment object
       const assignmentToCancel = assignments.find(a => a.menuItemId === item.id && a.userId === item.assignedTo);
 
-      // If a separate assignment object exists, delete it first
       if (assignmentToCancel) {
         await FirebaseService.deleteAssignment(assignmentToCancel.id);
-        deleteAssignment(assignmentToCancel.id); // Update local store
+        deleteAssignment(assignmentToCancel.id);
       }
       
-      // The main goal is to clear the assignment from the MenuItem.
-      // This runs regardless of whether the assignment object was found, ensuring the item is cleared.
       const menuItemUpdates = {
         assignedTo: undefined,
         assignedToName: undefined,
         assignedAt: undefined
       };
       
-      await FirebaseService.updateMenuItem(item.id, menuItemUpdates, true); // skipAdminCheck = true
-      updateMenuItem(item.id, menuItemUpdates); // Update local store
+      await FirebaseService.updateMenuItem(item.id, menuItemUpdates, true);
+      updateMenuItem(item.id, menuItemUpdates);
 
-      // Only show ONE toast, and it's a success toast.
       toast.success('השיבוץ בוטל בהצלחה!');
-
+      if (onAssignmentCancelled) {
+        onAssignmentCancelled();
+      }
     } catch (error) {
       console.error('Error canceling assignment as admin:', error);
       toast.error('שגיאה בביטול השיבוץ.');
@@ -253,15 +241,15 @@ export function MenuItemCard({ item, canAssign, isLoading = false, onAssign, onE
               {hasMultipleAssignments && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full mr-2">{itemAssignments.length} שיבוצים</span>}
             </div>
             <div className="text-left">
-              <p className="text-sm font-medium text-gray-900">{item.assignedToName}</p>
+              <p className="text-sm font-medium text-gray-900">{assignedUser?.name || 'שובץ'}</p>
               {item.assignedAt && <p className="text-xs text-gray-600"><Clock className="h-3 w-3 inline ml-1" />{new Date(item.assignedAt).toLocaleDateString('he-IL')}</p>}
             </div>
           </div>
           {isAdmin && !isMyAssignment && allUsers.length > 1 && (
             <div className="pt-2 border-t border-gray-200">
-              <select onChange={(e) => { const [userId, userName] = e.target.value.split('|'); if (userId && userName && userId !== item.assignedTo) { handleReplaceUser(userId, userName); } e.target.value = ''; }} className="w-full text-xs border border-gray-300 rounded px-2 py-1" defaultValue="">
+              <select onChange={(e) => { const [userId, userName] = e.target.value.split('|'); if (userId && userName && userId !== assignedTo) { handleReplaceUser(userId, userName); } e.target.value = ''; }} className="w-full text-xs border border-gray-300 rounded px-2 py-1" defaultValue="">
                 <option value="">החלף משתמש...</option>
-                {allUsers.filter(u => u.userId !== item.assignedTo).map(u => (<option key={`${u.userId}|${u.userName}`} value={`${u.userId}|${u.userName}`}>{u.userName}</option>))}
+                {allUsers.filter(u => u.id !== assignedTo).map(u => (<option key={u.id} value={`${u.id}|${u.name}`}>{u.name}</option>))}
               </select>
             </div>
           )}

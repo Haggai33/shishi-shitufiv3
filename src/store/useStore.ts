@@ -6,6 +6,7 @@ import { saveUserToLocalStorage, getUserFromLocalStorage } from '../utils/userUt
 interface StoreActions {
   // User actions
   setUser: (user: User | null) => void;
+  setUsers: (users: User[]) => void; // Add this
   initializeUser: (authUser: AuthUser) => void;
   
   // Events actions
@@ -39,6 +40,7 @@ interface StoreActions {
 export const useStore = create<AppState & StoreActions>((set, get) => ({
   // Initial state
   user: null,
+  users: [], // Add this
   events: [],
   menuItems: [],
   assignments: [],
@@ -49,6 +51,7 @@ export const useStore = create<AppState & StoreActions>((set, get) => ({
 
   // User actions
   setUser: (user) => set({ user }),
+  setUsers: (users) => set({ users }), // Add this
   
   initializeUser: (authUser) => {
     if (!authUser) {
