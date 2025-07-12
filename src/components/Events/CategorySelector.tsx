@@ -16,7 +16,6 @@ interface CategorySelectorProps {
   menuItems: MenuItem[];
   assignments: Assignment[];
   onSelectCategory: (category: string) => void;
-  onShowMyAssignments: () => void;
   onAddItem: () => void;
   canAddMoreItems: boolean;
 }
@@ -26,7 +25,6 @@ export function CategorySelector({
   menuItems,
   assignments,
   onSelectCategory,
-  onShowMyAssignments,
   onAddItem,
   canAddMoreItems,
 }: CategorySelectorProps) {
@@ -55,13 +53,6 @@ export function CategorySelector({
 
   return (
     <div className="text-center">
-      <button
-        onClick={onShowMyAssignments}
-        className="w-full mb-8 px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold rounded-lg shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
-      >
-        צפה בשיבוצים שלי
-      </button>
-
       <h2 className="text-3xl font-bold text-gray-800 mb-8">מה בא לך להביא לארוחה?</h2>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -98,9 +89,9 @@ export function CategorySelector({
         onClick={onAddItem}
         disabled={!canAddMoreItems}
         title={canAddMoreItems ? "הוסף פריט חדש" : `הגעת למכסת הפריטים`}
-        className="fixed bottom-6 right-6 z-20 flex items-center justify-center w-16 h-16 bg-primary text-white rounded-full text-4xl font-bold transition-all shadow-lg hover:shadow-xl transform hover:scale-110 disabled:bg-gray-400 disabled:cursor-not-allowed"
+        className="w-full mt-8 px-4 py-3 bg-green-500 text-white font-bold rounded-lg shadow-lg hover:bg-green-600 transition-transform transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed"
       >
-        <Plus />
+        הוסף פריט משלך
       </button>
     </div>
   );

@@ -154,40 +154,54 @@ export function EventsList() {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-4">
             <div className="flex flex-col space-y-2">
               <div className="flex items-center justify-between">
-                <h1 className="text-lg font-bold text-gray-900 truncate">{activeEvent.title}</h1>
-                {isAdmin && (<button onClick={() => setShowBulkManager(true)} className="text-xs bg-blue-500 hover:bg-blue-600 text-white font-semibold px-3 py-1.5 rounded-md transition-colors">BULK EDIT</button>)}
+                <h1 className="text-lg font-bold text-text truncate">{activeEvent.title}</h1>
+                {isAdmin && (<button onClick={() => setShowBulkManager(true)} className="text-xs bg-primary hover:bg-primary-dark text-white font-semibold px-3 py-1.5 rounded-md transition-colors">BULK EDIT</button>)}
               </div>
-              <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600">
+              <div className="flex flex-wrap items-center gap-3 text-xs text-text">
                 <div className="flex items-center"><Calendar className="h-3 w-3 ml-1" /><span>{formatDate(activeEvent.date)}</span></div>
                 <div className="flex items-center"><Clock className="h-3 w-3 ml-1" /><span>{formatTime(activeEvent.time)}</span></div>
                 <div className="flex items-center"><MapPin className="h-3 w-3 ml-1" /><span className="truncate max-w-24">{activeEvent.location}</span></div>
-                {eventMenuItems.length > 0 && (<div className="flex items-center"><ChefHat className="h-3 w-3 ml-1" /><span className="font-medium text-green-600">{assignedItems.length}/{eventMenuItems.length} שובצו</span></div>)}
+                {eventMenuItems.length > 0 && (<div className="flex items-center"><ChefHat className="h-3 w-3 ml-1" /><span className="font-medium text-success">{assignedItems.length}/{eventMenuItems.length} שובצו</span></div>)}
               </div>
             </div>
           </div>
           
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-4 space-y-3">
-            <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">חיפוש מהיר</label>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 mb-4">
+            <div className="flex items-center space-x-4 rtl:space-x-reverse">
+              <div className="flex-grow">
+                <label className="block text-xs font-medium text-text mb-1">חיפוש מהיר</label>
                 <div className="relative">
-                    <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                    <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="חפש פריט לפי שם..."
-                        className="w-full pr-10 pl-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
-                    />
-                    {searchTerm && (
-                      <button
-                        onClick={() => setSearchTerm('')}
-                        className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                        aria-label="נקה חיפוש"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
+                  <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="חפש פריט..."
+                    className="w-full pr-10 pl-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent text-sm"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      aria-label="נקה חיפוש"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
+              </div>
+              <div className="flex-shrink-0">
+                <label className="block text-xs font-medium text-text mb-1 invisible">השיבוצים שלי</label>
+                <button
+                  onClick={() => {
+                    setShowMyAssignments(true);
+                    setSelectedCategory(null);
+                  }}
+                  className="w-full px-4 py-2 bg-primary text-white font-semibold rounded-lg shadow-sm hover:bg-primary-dark transition-colors text-sm"
+                >
+                  השיבוצים שלי
+                </button>
+              </div>
             </div>
           </div>
 
@@ -198,11 +212,6 @@ export function EventsList() {
                 assignments={eventAssignments}
                 onSelectCategory={(category) => {
                   setSelectedCategory(category);
-                  setShowMyAssignments(false);
-                }}
-                onShowMyAssignments={() => {
-                  setShowMyAssignments(true);
-                  setSelectedCategory(null);
                 }}
                 onAddItem={() => setShowUserItemForm(true)}
                 canAddMoreItems={canAddMoreItems}
@@ -216,12 +225,12 @@ export function EventsList() {
                       setShowMyAssignments(false);
                       setSearchTerm('');
                     }}
-                    className="flex items-center text-sm font-semibold text-orange-600 hover:text-orange-800 transition-colors"
+                    className="flex items-center text-sm font-semibold text-primary hover:text-primary-dark transition-colors"
                   >
                     <ArrowRight className="h-4 w-4 ml-2" />
                     {showMyAssignments ? 'חזור לקטגוריות' : selectedCategory ? 'חזור לקטגוריות' : 'חזרה'}
                   </button>
-                  <h2 className="text-lg font-bold text-gray-800">
+                  <h2 className="text-lg font-bold text-text">
                     {showMyAssignments ? 'השיבוצים שלי' : selectedCategory ? categoryNames[selectedCategory] : 'תוצאות חיפוש'}
                   </h2>
                 </div>
@@ -229,7 +238,7 @@ export function EventsList() {
                 {itemsToRender.available.length === 0 && itemsToRender.assigned.length === 0 ? (
                   <div className="text-center py-8">
                     <ChefHat className="h-12 w-12 mx-auto text-gray-300" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">
+                    <h3 className="mt-2 text-sm font-medium text-text">
                       {showMyAssignments ? 'עדיין לא שובצת לפריטים' : 'אין פריטים בקטגוריה זו'}
                     </h3>
                   </div>
@@ -237,7 +246,7 @@ export function EventsList() {
                   <div className="space-y-6">
                     {itemsToRender.available.length > 0 && (
                       <div>
-                        <h3 className="text-md font-semibold text-gray-700 mb-3">פריטים פנויים</h3>
+                        <h3 className="text-md font-semibold text-text mb-3">פריטים פנויים</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           {itemsToRender.available.map((item) => (
                             <MenuItemCard key={item.id} item={item} canAssign={!!canAssign} onAssign={() => handleAssignItem(item)} onEdit={() => handleEditAssignment(item)} onAssignmentCancelled={() => { setSelectedCategory(null); setShowMyAssignments(false); }} />
@@ -248,7 +257,7 @@ export function EventsList() {
 
                     {itemsToRender.assigned.length > 0 && (
                       <div>
-                        <h3 className="text-md font-semibold text-gray-700 mb-3 border-t pt-4 mt-4">פריטים ששובצו</h3>
+                        <h3 className="text-md font-semibold text-text mb-3 border-t pt-4 mt-4">פריטים ששובצו</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           {itemsToRender.assigned.map((item) => (
                             <MenuItemCard key={item.id} item={item} canAssign={!!canAssign} onAssign={() => handleAssignItem(item)} onEdit={() => handleEditAssignment(item)} assignedTo={eventAssignments.find(a => a.menuItemId === item.id)?.userId} allUsers={users} onAssignmentCancelled={() => { setSelectedCategory(null); setShowMyAssignments(false); }} />

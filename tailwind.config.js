@@ -4,13 +4,12 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: '#2563eb',
-        secondary: '#4b5563',
-        background: '#f9fafb',
-        accent: '#f59e0b',
+        primary: '#009688',
+        accent: '#FFA726',
+        text: '#37474F',
+        background: '#F5F7FA',
         success: '#10b981',
         error: '#ef4444',
-        glass: 'rgba(255, 255, 255, 0.1)',
       },
     },
   },
