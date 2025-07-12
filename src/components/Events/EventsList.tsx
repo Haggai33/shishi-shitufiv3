@@ -194,10 +194,14 @@ export function EventsList() {
                 <label className="block text-xs font-medium text-text mb-1 invisible">השיבוצים שלי</label>
                 <button
                   onClick={() => {
-                    setShowMyAssignments(true);
+                    setShowMyAssignments(!showMyAssignments);
                     setSelectedCategory(null);
                   }}
-                  className="w-full px-4 py-2 bg-primary text-white font-semibold rounded-lg shadow-sm hover:bg-primary-dark transition-colors text-sm"
+                  className={`w-full px-4 py-2 font-semibold rounded-lg shadow-sm transition-colors text-sm ${
+                    showMyAssignments
+                      ? 'bg-accent text-white'
+                      : 'bg-primary text-white hover:bg-primary-dark'
+                  }`}
                 >
                   השיבוצים שלי
                 </button>
