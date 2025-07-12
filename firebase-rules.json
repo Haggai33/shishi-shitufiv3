@@ -2,49 +2,48 @@
   "rules": {
     "events": {
       ".read": "auth != null",
-      // רק מנהלים יכולים לכתוב לאירועים
       ".write": "root.child('admins').child(auth.uid).exists()"
     },
     "menuItems": {
       ".read": "auth != null",
-      // כל משתמש מחובר יכול לקרוא פריטים
-      ".write": "root.child('admins').child(auth.uid).exists() || !data.exists()",
-      // רק מנהל יכול לערוך או למחוק פריט קיים
-      // משתמש רגיל יכול להוסיף פריט חדש (כאשר המידע עוד לא קיים)
       "$itemId": {
-        ".write": "root.child('admins').child(auth.uid).exists() || (newData.exists() && !data.exists() && newData.child('creatorId').val() === auth.uid) || (data.exists() && data.child('creatorId').val() === auth.uid && !newData.exists())"
-        // 1. מנהל יכול לעשות הכל
-        // 2. משתמש יכול ליצור פריט חדש אם הוא היוצר שלו
-        // 3. משתמש יכול למחוק פריט קיים רק אם הוא היוצר שלו
+        ".write": 
+          // 1. מנהל יכול לעשות הכל
+          "root.child('admins').child(auth.uid).exists() || " +
+          
+          // 2. משתמש יכול ליצור פריט חדש אם הוא מוגדר כיוצר
+          "(newData.exists() && !data.exists() && newData.child('creatorId').val() === auth.uid) || " +
+          
+          // 3. היוצר יכול למחוק את הפריט שיצר (אם הוא לא משובץ, או משובץ לעצמו)
+          "(data.exists() && !newData.exists() && data.child('creatorId').val() === auth.uid && (!data.child('assignedTo').exists() || data.child('assignedTo').val() === auth.uid)) || " +
+          
+          // 4. כל משתמש מחובר יכול לשבץ את עצמו לפריט פנוי
+          "(data.exists() && newData.exists() && !data.child('assignedTo').exists() && newData.child('assignedTo').val() === auth.uid) || " +
+
+          // 5. משתמש ששובץ יכול לבטל את השיבוץ של עצמו
+          "(data.exists() && newData.exists() && data.child('assignedTo').val() === auth.uid && !newData.child('assignedTo').exists()) || " +
+          
+          // 6. היוצר יכול לערוך את הפריט (אם הוא לא משובץ, או משובץ לעצמו)
+          "(data.exists() && newData.exists() && data.child('creatorId').val() === auth.uid && (!data.child('assignedTo').exists() || data.child('assignedTo').val() === auth.uid))"
       }
     },
     "assignments": {
       ".read": "auth != null",
-      // רק משתמש מחובר יכול לקרוא שיבוצים
       "$assignmentId": {
-        // כלל לכתיבה (יצירה, עדכון, מחיקה)
         ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || !data.exists() || data.child('userId').val() === auth.uid)",
-        // הסבר:
-        // 1. מנהל יכול לעשות הכל: root.child('admins').child(auth.uid).exists()
-        // 2. משתמש חדש יכול ליצור שיבוץ (כי המידע עדיין לא קיים): !data.exists()
-        // 3. משתמש יכול לערוך או למחוק רק שיבוץ ששייך לו: data.child('userId').val() === auth.uid
         ".validate": "newData.hasChildren(['eventId', 'menuItemId', 'userId', 'userName', 'quantity', 'status', 'assignedAt'])"
       }
     },
     "admins": {
       ".read": "auth != null",
-      // רק מנהלים קיימים יכולים להוסיף, לערוך או למחוק מנהלים אחרים
       ".write": "root.child('admins').child(auth.uid).exists()",
       "$uid": {
-        // כל מנהל יכול לערוך את הפרטים של עצמו
         ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.uid == $uid)",
-        // חוק אימות למניעת מחיקת מנהל-העל
         ".validate": "newData.exists() || data.child('email').val() !== 'chagai33@gmail.com'"
       }
     },
     "presetLists": {
       ".read": "auth != null",
-      // רק מנהלים יכולים לנהל רשימות מוכנות
       ".write": "root.child('admins').child(auth.uid).exists()"
     }
   }
