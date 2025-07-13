@@ -100,6 +100,11 @@ export function EventsList() {
     return [];
   }, [eventMenuItems, searchTerm, selectedCategory, showMyAssignments, eventAssignments, user?.id]);
 
+  const availableCategories = useMemo(() => {
+    const categories = new Set(eventMenuItems.map(item => item.category));
+    return Array.from(categories);
+  }, [eventMenuItems]);
+
   const itemsToRender = useMemo(() => {
     if (searchTerm.trim() || showMyAssignments || selectedCategory) {
       const assigned = displayedItems.filter(item =>
@@ -280,7 +285,7 @@ export function EventsList() {
       {selectedMenuItem && activeEvent && (<AssignmentModal menuItem={selectedMenuItem} event={activeEvent} onClose={() => setSelectedMenuItem(null)} />)}
       {editingAssignment && activeEvent && (<EditAssignmentModal menuItem={editingAssignment.item} event={activeEvent} assignment={editingAssignment.assignment} onClose={() => setEditingAssignment(null)} />)}
       
-      {showUserItemForm && activeEvent && (<UserMenuItemForm event={activeEvent} onClose={() => setShowUserItemForm(false)} />)}
+      {showUserItemForm && activeEvent && (<UserMenuItemForm event={activeEvent} onClose={() => setShowUserItemForm(false)} availableCategories={availableCategories} />)}
     </div>
   );
 }

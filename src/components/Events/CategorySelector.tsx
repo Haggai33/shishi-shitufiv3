@@ -48,7 +48,7 @@ export function CategorySelector({
     main: { icon: '/Icons/1.gif', glowClass: 'glow-main', color: '#ff8a00' },
     dessert: { icon: '/Icons/3.gif', glowClass: 'glow-dessert', color: '#9b59b6' },
     drink: { icon: '/Icons/4.gif', glowClass: 'glow-drink', color: '#2ecc71' },
-    other: { icon: 'https://bvconuycpdvgzbvbkijl.supabase.co/storage/v1/object/public/sizes/ddbd61-bulb/front/200/color.webp', glowClass: 'glow-other', color: '#95a5a6' },
+    other: { icon: '/Icons/5.gif', glowClass: 'glow-other', color: '#95a5a6' },
   };
 
   return (

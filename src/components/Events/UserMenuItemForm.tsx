@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { X, ChefHat, Hash, FileText, AlertCircle, User } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { FirebaseService } from '../../services/firebaseService';
@@ -6,12 +6,12 @@ import { database } from '../../lib/firebase';
 import { ref, push, update } from 'firebase/database';
 import { ShishiEvent, MenuItem, MenuCategory } from '../../types';
 import toast from 'react-hot-toast';
-// 1. הסרת ייבוא מיותר
 import { saveUserToLocalStorage } from '../../utils/userUtils';
 
 interface UserMenuItemFormProps {
   event: ShishiEvent;
   onClose: () => void;
+  availableCategories: string[];
 }
 
 interface FormErrors {
@@ -20,8 +20,7 @@ interface FormErrors {
   userName?: string;
 }
 
-export function UserMenuItemForm({ event, onClose }: UserMenuItemFormProps) {
-  // 2. הסרת addMenuItem
+export function UserMenuItemForm({ event, onClose, availableCategories }: UserMenuItemFormProps) {
   const { user, setUser, menuItems } = useStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -31,18 +30,25 @@ export function UserMenuItemForm({ event, onClose }: UserMenuItemFormProps) {
 
   const [formData, setFormData] = useState({
     name: '',
-    category: 'main' as MenuCategory,
+    category: (availableCategories.length > 0 ? availableCategories[0] : 'other') as MenuCategory,
     quantity: 1,
     notes: ''
   });
 
-  const categoryOptions = [
-    { value: 'starter', label: 'מנה ראשונה' },
-    { value: 'main', label: 'מנה עיקרית' },
-    { value: 'dessert', label: 'קינוח' },
-    { value: 'drink', label: 'משקה' },
-    { value: 'other', label: 'אחר' }
-  ];
+  const categoryOptions = useMemo(() => {
+    const uniqueCategories = [...new Set([...availableCategories, 'other'])];
+    const categoryLabels: { [key: string]: string } = {
+      starter: 'מנה ראשונה',
+      main: 'מנה עיקרית',
+      dessert: 'קינוח',
+      drink: 'משקה',
+      other: 'אחר'
+    };
+    return uniqueCategories.map(category => ({
+      value: category,
+      label: categoryLabels[category] || category
+    }));
+  }, [availableCategories]);
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
