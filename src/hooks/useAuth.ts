@@ -19,6 +19,7 @@ export function useAuth() {
       if (firebaseUser) {
         const userRef = ref(database, `users/${firebaseUser.uid}`);
         const snapshot = await get(userRef);
+        const isAdmin = await FirebaseService.checkAdminStatus(firebaseUser.uid);
 
         if (!snapshot.exists()) {
           const newUser: User = {
@@ -26,26 +27,23 @@ export function useAuth() {
             name: firebaseUser.displayName || '',
             email: firebaseUser.email || '',
             createdAt: Date.now(),
-            isAdmin: false,
+            isAdmin,
           };
           await set(userRef, newUser);
           useStore.getState().setUser(newUser);
         } else {
-          useStore.getState().setUser(snapshot.val());
+          const existingUser = snapshot.val();
+          if (existingUser.isAdmin !== isAdmin) {
+            await set(userRef, { ...existingUser, isAdmin });
+            useStore.getState().setUser({ ...existingUser, isAdmin });
+          } else {
+            useStore.getState().setUser(existingUser);
+          }
         }
-      }
-
-      setUser(firebaseUser);
-      
-      if (firebaseUser) {
-        try {
-          const isAdmin = await FirebaseService.checkAdminStatus(firebaseUser.uid);
-          setUserAdminStatus(isAdmin);
-        } catch (error) {
-          console.error("Failed to check admin status:", error);
-          setUserAdminStatus(false);
-        }
+        setUser(firebaseUser);
+        setUserAdminStatus(isAdmin);
       } else {
+        setUser(null);
         setUserAdminStatus(false);
         clearAndUnsubscribeListeners();
       }

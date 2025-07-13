@@ -95,11 +95,14 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
     try {
       let finalUserName = user.name;
 
-      if (isNameRequired) {
-        const updatedUser = { ...user, name: newUserName.trim() };
+      if (isNameRequired && newUserName.trim()) {
+        finalUserName = newUserName.trim();
+        const userRef = ref(database, `users/${user.id}`);
+        await update(userRef, { name: finalUserName });
+        
+        const updatedUser = { ...user, name: finalUserName };
         saveUserToLocalStorage(updatedUser);
         setUser(updatedUser);
-        finalUserName = newUserName.trim();
       }
 
       const eventMenuItems = menuItems.filter(mi => mi.eventId === event.id);

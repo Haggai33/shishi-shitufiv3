@@ -8,11 +8,16 @@ import { ShishiEvent } from '../../types';
 import { formatDate, formatTime } from '../../utils/dateUtils';
 import toast from 'react-hot-toast';
 
-export function EventsManagement() {
+interface EventsManagementProps {
+  setShowEventForm: (show: boolean) => void;
+  setEditingEvent: (event: ShishiEvent | null) => void;
+  setShowImportModal: (show: boolean) => void;
+  setSelectedEventForImport: (event: ShishiEvent | null) => void;
+}
+
+export function EventsManagement({ setShowEventForm, setEditingEvent, setShowImportModal, setSelectedEventForImport }: EventsManagementProps) {
   const { events, menuItems, assignments, deleteEvent } = useStore();
   const [selectedEvent, setSelectedEvent] = useState<ShishiEvent | null>(null);
-  const [showEventForm, setShowEventForm] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<ShishiEvent | null>(null);
   const [showMenuManagement, setShowMenuManagement] = useState(false);
   const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
 
@@ -57,6 +62,8 @@ export function EventsManagement() {
           setShowMenuManagement(false);
           setSelectedEvent(null);
         }}
+        setShowImportModal={setShowImportModal}
+        setSelectedEventForImport={setSelectedEventForImport}
       />
     );
   }
@@ -64,7 +71,19 @@ export function EventsManagement() {
   return (
     <div>
       {/* Header */}
-      
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-xl font-semibold text-gray-900">ניהול אירועים</h3>
+        <button
+          onClick={() => {
+            setEditingEvent(null);
+            setShowEventForm(true);
+          }}
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center"
+        >
+          <Plus className="h-4 w-4 ml-2" />
+          הוסף אירוע
+        </button>
+      </div>
 
       {/* Events List */}
       <div className="space-y-4">
@@ -76,7 +95,10 @@ export function EventsManagement() {
             <h3 className="text-lg font-medium text-gray-900 mb-2">אין אירועים</h3>
             <p className="text-gray-500 mb-4">התחל על ידי יצירת האירוע הראשון</p>
             <button
-              onClick={() => setShowEventForm(true)}
+              onClick={() => {
+                setEditingEvent(null);
+                setShowEventForm(true);
+              }}
               className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
             >
               צור אירוע ראשון
@@ -195,16 +217,7 @@ export function EventsManagement() {
         )}
       </div>
 
-      {/* Event Form Modal */}
-      {showEventForm && (
-        <EventForm
-          event={editingEvent || undefined}
-          onClose={() => {
-            setShowEventForm(false);
-            setEditingEvent(null);
-          }}
-        />
-      )}
+      {/* Event Form Modal is now in AdminPanel */}
     </div>
   );
 }

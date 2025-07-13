@@ -1,5 +1,5 @@
 import { ref, push, set, onValue, off, remove, update, get, DataSnapshot } from 'firebase/database';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { database, auth } from '../lib/firebase';
 import { isCurrentlyLoggingOut } from '../hooks/useAuth';
 import { ShishiEvent, MenuItem, Assignment, User } from '../types';
@@ -36,6 +36,9 @@ export class FirebaseService {
       // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
       const newUser = userCredential.user;
+
+      // **FIX**: Update the user's profile with the display name
+      await updateProfile(newUser, { displayName: displayName.trim() });
 
       // Add user to admins table in Realtime Database
       const adminRef = ref(database, `admins/${newUser.uid}`);
@@ -869,4 +872,45 @@ export class FirebaseService {
       throw new Error('שגיאה בניקוי שיבוצי רפאים');
     }
   }
+
+  static async deleteTemporaryUsers(userIds: string[]): Promise<boolean> {
+    try {
+      const updates: { [key: string]: null } = {};
+      const menuItemsRef = ref(database, 'menuItems');
+      const assignmentsRef = ref(database, 'assignments');
+
+      const [menuItemsSnapshot, assignmentsSnapshot] = await Promise.all([
+        get(menuItemsRef),
+        get(assignmentsRef)
+      ]);
+
+      const menuItems = menuItemsSnapshot.val() || {};
+      const assignments = assignmentsSnapshot.val() || {};
+
+      for (const userId of userIds) {
+        updates[`/users/${userId}`] = null;
+      }
+
+      for (const itemId in menuItems) {
+        if (userIds.includes(menuItems[itemId].assignedTo)) {
+          updates[`/menuItems/${itemId}/assignedTo`] = null;
+          updates[`/menuItems/${itemId}/assignedToName`] = null;
+          updates[`/menuItems/${itemId}/assignedAt`] = null;
+        }
+      }
+
+      for (const assignmentId in assignments) {
+        if (userIds.includes(assignments[assignmentId].userId)) {
+          updates[`/assignments/${assignmentId}`] = null;
+        }
+      }
+
+      await update(ref(database), updates);
+      return true;
+    } catch (error) {
+      console.error('Error deleting temporary users:', error);
+      throw new Error('שגיאה במחיקת משתמשים זמניים');
+    }
+  }
+
 }

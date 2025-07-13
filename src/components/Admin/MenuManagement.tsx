@@ -11,9 +11,11 @@ import toast from 'react-hot-toast';
 interface MenuManagementProps {
   event: ShishiEvent;
   onBack: () => void;
+  setShowImportModal: (show: boolean) => void;
+  setSelectedEventForImport: (event: ShishiEvent | null) => void;
 }
 
-export function MenuManagement({ event, onBack }: MenuManagementProps) {
+export function MenuManagement({ event, onBack, setShowImportModal, setSelectedEventForImport }: MenuManagementProps) {
   const { user, menuItems, assignments, deleteMenuItem } = useStore();
   const isAdmin = user?.isAdmin || false;
 
@@ -21,7 +23,6 @@ export function MenuManagement({ event, onBack }: MenuManagementProps) {
   const [showItemForm, setShowItemForm] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [managingAssignments, setManagingAssignments] = useState<MenuItem | null>(null);
-  const [showImportModal, setShowImportModal] = useState(false);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
 
   const eventMenuItems = menuItems.filter(item => item.eventId === event.id);
@@ -89,7 +90,10 @@ export function MenuManagement({ event, onBack }: MenuManagementProps) {
           {/* Import Button - Only for admins */}
           {isAdmin && (
             <button
-              onClick={() => setShowImportModal(true)}
+              onClick={() => {
+                setSelectedEventForImport(event);
+                setShowImportModal(true);
+              }}
               className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 rtl:space-x-reverse transition-colors"
             >
               <Upload className="h-4 w-4" />
@@ -125,7 +129,10 @@ export function MenuManagement({ event, onBack }: MenuManagementProps) {
               </button>
               {isAdmin && (
                 <button
-                  onClick={() => setShowImportModal(true)}
+                  onClick={() => {
+                    setSelectedEventForImport(event);
+                    setShowImportModal(true);
+                  }}
                   className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
                 >
                   ייבוא פריטים
@@ -234,13 +241,7 @@ export function MenuManagement({ event, onBack }: MenuManagementProps) {
         />
       )}
 
-      {/* Import Items Modal */}
-      {showImportModal && isAdmin && (
-        <ImportItemsModal
-          event={event}
-          onClose={() => setShowImportModal(false)}
-        />
-      )}
+      {/* Import Items Modal is now in AdminPanel */}
 
       {/* Assignment Manager Modal */}
       {managingAssignments && (

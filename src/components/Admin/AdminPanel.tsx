@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { Plus, Settings, Users, BarChart3, Shield, Trash2 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { EventForm } from './EventForm';
+import { ShishiEvent } from '../../types';
 import { EventsManagement } from './EventsManagement';
 import { Statistics } from './Statistics';
 import { AdminUsersManagement } from './AdminUsersManagement';
 import { TemporaryUserManagement } from './TemporaryUserManagement';
+import { ImportItemsModal } from './ImportItemsModal';
 import { FirebaseService } from '../../services/firebaseService';
 import toast from 'react-hot-toast';
 
@@ -56,6 +58,9 @@ export function AdminPanel() {
   const { events, assignments } = useStore();
   const [activeTab, setActiveTab] = useState<'events' | 'stats' | 'admins' | 'temp-users' | 'maintenance'>('events');
   const [showEventForm, setShowEventForm] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<ShishiEvent | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [selectedEventForImport, setSelectedEventForImport] = useState<ShishiEvent | null>(null);
 
   const tabs = [
     { id: 'events', label: 'ניהול אירועים', icon: Settings },
@@ -128,7 +133,7 @@ export function AdminPanel() {
 
         {/* אזור התוכן */}
         <div className="p-4 sm:p-6">
-          {activeTab === 'events' && <EventsManagement />}
+          {activeTab === 'events' && <EventsManagement setShowEventForm={setShowEventForm} setEditingEvent={setEditingEvent} setShowImportModal={setShowImportModal} setSelectedEventForImport={setSelectedEventForImport} />}
           {activeTab === 'stats' && <Statistics />}
           {activeTab === 'admins' && <AdminUsersManagement />}
           {activeTab === 'temp-users' && <TemporaryUserManagement />}
@@ -139,7 +144,21 @@ export function AdminPanel() {
       {/* מודל ליצירת אירוע */}
       {showEventForm && (
         <EventForm
-          onClose={() => setShowEventForm(false)}
+          event={editingEvent || undefined}
+          onClose={() => {
+            setShowEventForm(false);
+            setEditingEvent(null);
+          }}
+        />
+      )}
+
+      {showImportModal && selectedEventForImport && (
+        <ImportItemsModal
+          event={selectedEventForImport}
+          onClose={() => {
+            setShowImportModal(false);
+            setSelectedEventForImport(null);
+          }}
         />
       )}
     </div>

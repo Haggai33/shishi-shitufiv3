@@ -4,6 +4,8 @@ import { useStore } from '../../store/useStore';
 import { FirebaseService } from '../../services/firebaseService';
 import { MenuItem, ShishiEvent, Assignment } from '../../types';
 import { saveUserToLocalStorage, updateUserInLocalStorage } from '../../utils/userUtils';
+import { database } from '../../lib/firebase';
+import { ref, update } from 'firebase/database';
 import toast from 'react-hot-toast';
 
 interface AssignmentModalProps {
@@ -69,15 +71,14 @@ export function AssignmentModal({ menuItem, event, onClose }: AssignmentModalPro
     try {
       let finalUserName = user.name;
 
-      if (!hasUserName) {
-        const updatedUser = {
-          ...user,
-          name: name.trim()
-        };
-        
+      if (!hasUserName && name.trim()) {
+        finalUserName = name.trim();
+        const userRef = ref(database, `users/${user.id}`);
+        await update(userRef, { name: finalUserName });
+
+        const updatedUser = { ...user, name: finalUserName };
         saveUserToLocalStorage(updatedUser);
         setUser(updatedUser);
-        finalUserName = name.trim();
       }
 
       console.log('Creating assignment with data:', {

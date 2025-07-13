@@ -83,11 +83,35 @@ export function TemporaryUserManagement() {
     }
   };
 
+  const usersWithAssignments = useMemo(() => {
+    return selectedUsers.filter(userId => assignments.some(a => a.userId === userId));
+  }, [selectedUsers, assignments]);
+
+  const handleBulkDelete = async (deleteWithAssignments: boolean) => {
+    const usersToDelete = deleteWithAssignments ? selectedUsers : selectedUsers.filter(id => !usersWithAssignments.includes(id));
+    if (usersToDelete.length === 0) {
+      toast.error('לא נבחרו משתמשים למחיקה.');
+      return;
+    }
+
+    if (window.confirm(`האם אתה בטוח שברצונך למחוק ${usersToDelete.length} משתמשים?`)) {
+      try {
+        await FirebaseService.deleteTemporaryUsers(usersToDelete);
+        setSelectedUsers([]);
+        toast.success(`${usersToDelete.length} משתמשים נמחקו בהצלחה.`);
+      } catch (error) {
+        toast.error('שגיאה במחיקת המשתמשים.');
+        console.error(error);
+      }
+    }
+  };
+
   return (
     <div className="p-6 bg-white rounded-lg shadow-md">
       <h2 className="text-2xl font-bold mb-4 text-gray-800">ניהול משתמשים זמניים</h2>
 
-      <div className="flex items-center space-x-4 rtl:space-x-reverse mb-4">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center space-x-4 rtl:space-x-reverse">
         <div>
           <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700">
             סנן לפי סטטוס
@@ -119,6 +143,25 @@ export function TemporaryUserManagement() {
             ))}
           </select>
         </div>
+        </div>
+        {selectedUsers.length > 0 && (
+          <div className="flex items-center space-x-2 rtl:space-x-reverse">
+            {usersWithAssignments.length > 0 ? (
+              <>
+                <button onClick={() => handleBulkDelete(true)} className="bg-red-600 text-white px-3 py-1 rounded-md text-sm">
+                  מחק הכל ({selectedUsers.length})
+                </button>
+                <button onClick={() => handleBulkDelete(false)} className="bg-yellow-500 text-white px-3 py-1 rounded-md text-sm">
+                  מחק רק לא משובצים ({selectedUsers.length - usersWithAssignments.length})
+                </button>
+              </>
+            ) : (
+              <button onClick={() => handleBulkDelete(true)} className="bg-red-500 text-white px-3 py-1 rounded-md text-sm">
+                מחק נבחרים ({selectedUsers.length})
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="overflow-x-auto">
