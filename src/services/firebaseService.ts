@@ -101,17 +101,60 @@ export class FirebaseService {
 
   static async deleteAdminUser(uid: string): Promise<boolean> {
     try {
-      // Remove from admins table
-      const adminRef = ref(database, `admins/${uid}`);
-      await remove(adminRef);
+      console.log(`Starting deletion process for admin user: ${uid}`);
+
+      // 1. Get all menu items and assignments
+      const menuItemsRef = ref(database, 'menuItems');
+      const assignmentsRef = ref(database, 'assignments');
+
+      const [menuItemsSnapshot, assignmentsSnapshot] = await Promise.all([
+        get(menuItemsRef),
+        get(assignmentsRef)
+      ]);
+
+      const menuItems = menuItemsSnapshot.val() || {};
+      const assignments = assignmentsSnapshot.val() || {};
       
-      // Note: Deleting from Firebase Auth requires Admin SDK on server side
-      // For now, we just deactivate in the database
-      console.log('Admin user removed from database:', uid);
+      const updates: { [key: string]: null } = {};
+
+      // 2. Find and unassign menu items assigned to the user
+      for (const itemId in menuItems) {
+        if (menuItems[itemId].assignedTo === uid) {
+          console.log(`User ${uid} is assigned to menu item ${itemId}. Unassigning.`);
+          updates[`/menuItems/${itemId}/assignedTo`] = null;
+          updates[`/menuItems/${itemId}/assignedToName`] = null;
+          updates[`/menuItems/${itemId}/assignedAt`] = null;
+        }
+      }
+
+      // 3. Find and delete assignments made by the user
+      for (const assignmentId in assignments) {
+        if (assignments[assignmentId].userId === uid) {
+          console.log(`Found assignment ${assignmentId} by user ${uid}. Deleting.`);
+          updates[`/assignments/${assignmentId}`] = null;
+        }
+      }
+
+      // 4. Delete the admin user from the 'admins' table
+      updates[`/admins/${uid}`] = null;
+      console.log(`Marking admin ${uid} for deletion.`);
+
+      // 5. Perform all updates in a single atomic operation
+      if (Object.keys(updates).length > 0) {
+        await update(ref(database), updates);
+        console.log('Atomic update completed successfully.');
+      } else {
+        console.log('No related data found to clean up. Only deleting admin entry.');
+        // Fallback for safety, though the atomic update handles this.
+        const adminRef = ref(database, `admins/${uid}`);
+        await remove(adminRef);
+      }
+      
+      console.log('Admin user and all related data deleted successfully:', uid);
       return true;
     } catch (error) {
-      console.error('Error deleting admin user:', error);
-      throw new Error('שגיאה במחיקת המנהל');
+      console.error('Error deleting admin user and their assignments:', error);
+      throw new Error('שגיאה במחיקת המנהל וניקוי שיבוצים ישנים');
     }
   }
 
@@ -284,19 +327,62 @@ export class FirebaseService {
       if (!auth.currentUser) {
         throw new Error('נדרשת התחברות כמנהל');
       }
-
       const isAdmin = await this.checkAdminStatus(auth.currentUser.uid);
       if (!isAdmin) {
         throw new Error('אין הרשאות מנהל');
       }
-
-      const eventRef = ref(database, `events/${eventId}`);
-      await remove(eventRef);
+  
+      console.log(`Starting deletion for event ${eventId}`);
+  
+      // References
+      const menuItemsRef = ref(database, 'menuItems');
+      const assignmentsRef = ref(database, 'assignments');
+  
+      // Get all menu items and assignments
+      const [menuItemsSnapshot, assignmentsSnapshot] = await Promise.all([
+        get(menuItemsRef),
+        get(assignmentsRef)
+      ]);
+  
+      const menuItems = menuItemsSnapshot.val() || {};
+      const assignments = assignmentsSnapshot.val() || {};
+      
+      const updates: { [key: string]: null } = {};
+  
+      // Find items and assignments related to the event
+      for (const itemId in menuItems) {
+        if (menuItems[itemId].eventId === eventId) {
+          console.log(`Marking menu item ${itemId} from event ${eventId} for deletion.`);
+          updates[`/menuItems/${itemId}`] = null;
+        }
+      }
+  
+      for (const assignmentId in assignments) {
+        if (assignments[assignmentId].eventId === eventId) {
+          console.log(`Marking assignment ${assignmentId} from event ${eventId} for deletion.`);
+          updates[`/assignments/${assignmentId}`] = null;
+        }
+      }
+  
+      // Delete the event itself
+      updates[`/events/${eventId}`] = null;
+      console.log(`Marking event ${eventId} for deletion.`);
+  
+      // Perform atomic update
+      if (Object.keys(updates).length > 0) {
+        await update(ref(database), updates);
+        console.log(`Successfully deleted event ${eventId} and all related data.`);
+      } else {
+        // Fallback if no related items were found
+        const eventRef = ref(database, `events/${eventId}`);
+        await remove(eventRef);
+        console.log(`Successfully deleted event ${eventId} (no related items found).`);
+      }
       
       return true;
     } catch (error) {
       console.error('Error deleting event:', error);
-      throw error;
+      throw new Error('שגיאה במחיקת האירוע וכל הנתונים הקשורים אליו');
     }
   }
 
@@ -725,6 +811,62 @@ export class FirebaseService {
         hasAssignment: false,
         hasMenuItemAssignment: false
       };
+    }
+  }
+
+  // Function to clean up ghost assignments
+  static async cleanupGhostAssignments(): Promise<{ cleanedCount: number }> {
+    try {
+      console.log('Starting ghost assignment cleanup...');
+
+      // 1. Fetch all necessary data
+      const menuItemsRef = ref(database, 'menuItems');
+      const adminsRef = ref(database, 'admins');
+      const usersRef = ref(database, 'users'); // Assuming temporary users are in 'users'
+
+      const [menuItemsSnapshot, adminsSnapshot, usersSnapshot] = await Promise.all([
+        get(menuItemsRef),
+        get(adminsRef),
+        get(usersRef)
+      ]);
+
+      const menuItems = menuItemsSnapshot.val() || {};
+      const admins = adminsSnapshot.val() || {};
+      const users = usersSnapshot.val() || {};
+
+      const existingUserIds = new Set([...Object.keys(admins), ...Object.keys(users)]);
+      
+      const updates: { [key: string]: null } = {};
+      let cleanedCount = 0;
+
+      // 2. Iterate through menu items to find ghosts
+      for (const itemId in menuItems) {
+        const item = menuItems[itemId];
+        if (item.assignedTo && !existingUserIds.has(item.assignedTo)) {
+          console.log(`Found ghost assignment on item ${itemId} for deleted user ${item.assignedTo}.`);
+          updates[`/menuItems/${itemId}/assignedTo`] = null;
+          updates[`/menuItems/${itemId}/assignedToName`] = null;
+          updates[`/menuItems/${itemId}/assignedAt`] = null;
+          cleanedCount++;
+        }
+      }
+
+      // 3. Perform atomic update if ghosts were found
+      if (cleanedCount > 0) {
+        await update(ref(database), updates);
+        console.log(`Successfully cleaned ${cleanedCount} ghost assignments.`);
+        toast.success(`ניקוי הושלם: הוסרו ${cleanedCount} שיבוצי רפאים.`);
+      } else {
+        console.log('No ghost assignments found.');
+        toast.success('לא נמצאו שיבוצי רפאים לניקוי.');
+      }
+
+      return { cleanedCount };
+
+    } catch (error) {
+      console.error('Error during ghost assignment cleanup:', error);
+      toast.error('שגיאה במהלך ניקוי שיבוצי הרפאים.');
+      throw new Error('שגיאה בניקוי שיבוצי רפאים');
     }
   }
 }

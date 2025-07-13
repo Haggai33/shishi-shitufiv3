@@ -1,15 +1,60 @@
 import React, { useState } from 'react';
-import { Plus, Settings, Users, BarChart3, Shield } from 'lucide-react';
+import { Plus, Settings, Users, BarChart3, Shield, Trash2 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { EventForm } from './EventForm';
 import { EventsManagement } from './EventsManagement';
 import { Statistics } from './Statistics';
 import { AdminUsersManagement } from './AdminUsersManagement';
 import { TemporaryUserManagement } from './TemporaryUserManagement';
+import { FirebaseService } from '../../services/firebaseService';
+import toast from 'react-hot-toast';
+
+// A new component for the data maintenance tab
+const DataMaintenance = () => {
+  const [isCleaning, setIsCleaning] = useState(false);
+
+  const handleCleanup = async () => {
+    if (window.confirm('האם אתה בטוח שברצונך להריץ ניקוי שיבוצי רפאים? פעולה זו אינה הפיכה.')) {
+      setIsCleaning(true);
+      try {
+        await FirebaseService.cleanupGhostAssignments();
+      } catch (error) {
+        // Toast is already handled in the service
+      } finally {
+        setIsCleaning(false);
+      }
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-medium text-gray-900">תחזוקת נתונים</h3>
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <div className="flex items-center justify-between">
+          <div>
+            <h4 className="font-semibold">ניקוי שיבוצי רפאים</h4>
+            <p className="text-sm text-gray-600">
+              פעולה זו תסיר שיבוצים שנותרו מקושרים למשתמשים שנמחקו.
+            </p>
+          </div>
+          <button
+            onClick={handleCleanup}
+            disabled={isCleaning}
+            className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 disabled:bg-red-300 flex items-center gap-2"
+          >
+            <Trash2 className="h-4 w-4" />
+            {isCleaning ? 'מנקה...' : 'הפעל ניקוי'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 export function AdminPanel() {
   const { events, assignments } = useStore();
-  const [activeTab, setActiveTab] = useState<'events' | 'stats' | 'admins' | 'temp-users'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'stats' | 'admins' | 'temp-users' | 'maintenance'>('events');
   const [showEventForm, setShowEventForm] = useState(false);
 
   const tabs = [
@@ -17,6 +62,7 @@ export function AdminPanel() {
     { id: 'stats', label: 'סטטיסטיקות', icon: BarChart3 },
     { id: 'admins', label: 'ניהול מנהלים', icon: Shield },
     { id: 'temp-users', label: 'ניהול משתמשים זמניים', icon: Users },
+    { id: 'maintenance', label: 'תחזוקה', icon: Trash2 },
   ];
 
   return (
@@ -86,6 +132,7 @@ export function AdminPanel() {
           {activeTab === 'stats' && <Statistics />}
           {activeTab === 'admins' && <AdminUsersManagement />}
           {activeTab === 'temp-users' && <TemporaryUserManagement />}
+          {activeTab === 'maintenance' && <DataMaintenance />}
         </div>
       </div>
 
