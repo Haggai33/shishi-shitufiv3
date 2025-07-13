@@ -5,16 +5,18 @@ import { EventForm } from './EventForm';
 import { EventsManagement } from './EventsManagement';
 import { Statistics } from './Statistics';
 import { AdminUsersManagement } from './AdminUsersManagement';
+import { TemporaryUserManagement } from './TemporaryUserManagement';
 
 export function AdminPanel() {
   const { events, assignments } = useStore();
-  const [activeTab, setActiveTab] = useState<'events' | 'stats' | 'admins'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'stats' | 'admins' | 'temp-users'>('events');
   const [showEventForm, setShowEventForm] = useState(false);
 
   const tabs = [
     { id: 'events', label: 'ניהול אירועים', icon: Settings },
     { id: 'stats', label: 'סטטיסטיקות', icon: BarChart3 },
     { id: 'admins', label: 'ניהול מנהלים', icon: Shield },
+    { id: 'temp-users', label: 'ניהול משתמשים זמניים', icon: Users },
   ];
 
   return (
@@ -83,6 +85,7 @@ export function AdminPanel() {
           {activeTab === 'events' && <EventsManagement />}
           {activeTab === 'stats' && <Statistics />}
           {activeTab === 'admins' && <AdminUsersManagement />}
+          {activeTab === 'temp-users' && <TemporaryUserManagement />}
         </div>
       </div>
 
