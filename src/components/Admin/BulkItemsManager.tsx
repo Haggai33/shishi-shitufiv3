@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { ArrowRight, Edit, Trash2, Save, X, CheckSquare, Square, Search, Filter, AlertCircle, CheckCircle, RefreshCw, Slash } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { FirebaseService } from '../../services/firebaseService';
-import { MenuItem, MenuCategory, ShishiEvent } from '../../types';
+import { MenuItem, MenuCategory, ShishiEvent, User, Assignment } from '../../types';
 import toast from 'react-hot-toast';
 
 interface BulkItemsManagerProps {
@@ -10,7 +10,6 @@ interface BulkItemsManagerProps {
 }
 
 interface EditableItem extends MenuItem {
-  isEditing: boolean;
   isSelected: boolean;
   hasChanges: boolean;
   originalData: MenuItem;
@@ -31,10 +30,21 @@ const FilterButton = ({ label, isActive, onClick }: { label: string, isActive: b
 );
 
 export function BulkItemsManager({ onBack }: BulkItemsManagerProps) {
-  const { menuItems, events, assignments, updateMenuItem, deleteMenuItem, deleteAssignment } = useStore();
+  const { menuItems, events, assignments, users, updateMenuItem, deleteMenuItem, addAssignment, deleteAssignment } = useStore();
   const [editableItems, setEditableItems] = useState<EditableItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterEvent, setFilterEvent] = useState<string>('all');
+  const defaultEventId = useMemo(() => {
+    const upcomingEvents = events
+      .filter(e => e.date && new Date(e.date) > new Date())
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    return upcomingEvents.length > 0 ? upcomingEvents[0].id : 'all';
+  }, [events]);
+
+  const [filterEvent, setFilterEvent] = useState<string>(defaultEventId);
+  
+  React.useEffect(() => {
+    setFilterEvent(defaultEventId);
+  }, [defaultEventId]);
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterAssigned, setFilterAssigned] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(false);
@@ -42,11 +52,18 @@ export function BulkItemsManager({ onBack }: BulkItemsManagerProps) {
   const [bulkCategory, setBulkCategory] = useState<MenuCategory>('main');
   const [bulkRequired, setBulkRequired] = useState(false);
 
+  const eventUsers = useMemo(() => {
+    if (filterEvent === 'all') return [];
+    const eventAssignments = assignments.filter(a => a.eventId === filterEvent);
+    const userIds = new Set(eventAssignments.map(a => a.userId));
+    return users.filter(u => userIds.has(u.id));
+  }, [filterEvent, assignments, users]);
+
   // כל הלוגיקה הקיימת נשמרת במלואה, אנחנו רק משנים את תצוגת הסינון
   React.useEffect(() => {
     const items: EditableItem[] = menuItems.map(item => ({
       ...item,
-      isEditing: false, isSelected: false, hasChanges: false, originalData: { ...item }
+      isSelected: false, hasChanges: false, originalData: { ...item }
     }));
     setEditableItems(items);
   }, [menuItems]);
@@ -92,7 +109,7 @@ export function BulkItemsManager({ onBack }: BulkItemsManagerProps) {
       
       const refreshedItems: EditableItem[] = menuItems.map(item => ({
         ...item,
-        isEditing: false, isSelected: false, hasChanges: false, originalData: { ...item }
+        isSelected: false, hasChanges: false, originalData: { ...item }
       }));
       setEditableItems(refreshedItems);
       
@@ -105,14 +122,67 @@ export function BulkItemsManager({ onBack }: BulkItemsManagerProps) {
   };
   const toggleItemSelection = (itemId: string) => { setEditableItems(prev => prev.map(item => item.id === itemId ? { ...item, isSelected: !item.isSelected } : item)); };
   const toggleSelectAll = () => { const allSelected = filteredItems.every(item => item.isSelected); const filteredIds = filteredItems.map(item => item.id); setEditableItems(prev => prev.map(item => filteredIds.includes(item.id) ? { ...item, isSelected: !allSelected } : item)); };
-  const startEditing = (itemId: string) => { setEditableItems(prev => prev.map(item => item.id === itemId ? { ...item, isEditing: true } : item)); };
-  const cancelEditing = (itemId: string) => { setEditableItems(prev => prev.map(item => item.id === itemId ? { ...item.originalData, isEditing: false, isSelected: item.isSelected, hasChanges: false, originalData: item.originalData } : item)); };
-  const updateItemField = (itemId: string, field: keyof MenuItem, value: any) => { setEditableItems(prev => prev.map(item => { if (item.id === itemId) { const updatedItem = { ...item, [field]: value }; const originalForComparison = { ...item.originalData }; const currentForComparison = { ...updatedItem, isEditing: false, isSelected: false, hasChanges: false, originalData: undefined }; delete (currentForComparison as any).isEditing; delete (currentForComparison as any).isSelected; delete (currentForComparison as any).hasChanges; delete (currentForComparison as any).originalData; const hasChanges = JSON.stringify(originalForComparison) !== JSON.stringify(currentForComparison); return { ...updatedItem, hasChanges }; } return item; })); };
-  const saveItem = async (itemId: string) => { const item = editableItems.find(i => i.id === itemId); if (!item || !item.hasChanges) return; setIsLoading(true); try { const updates = { name: item.name, category: item.category, quantity: item.quantity, notes: item.notes, isRequired: item.isRequired }; const success = await FirebaseService.updateMenuItem(itemId, updates); if (success) { updateMenuItem(itemId, updates); setEditableItems(prev => prev.map(i => i.id === itemId ? { ...i, isEditing: false, hasChanges: false, originalData: { ...i, isEditing: false, isSelected: false, hasChanges: false, originalData: i.originalData } } : i)); toast.success('הפריט עודכן בהצלחה'); } else { throw new Error('Failed to update item'); } } catch (error) { console.error('Error saving item:', error); toast.error('שגיאה בשמירת הפריט'); } finally { setIsLoading(false); } };
-  const saveAllChanges = async () => { const changedItems = editableItems.filter(item => item.hasChanges); if (changedItems.length === 0) return; setIsLoading(true); let successCount = 0; let errorCount = 0; try { for (const item of changedItems) { try { const updates = { name: item.name, category: item.category, quantity: item.quantity, notes: item.notes, isRequired: item.isRequired }; const success = await FirebaseService.updateMenuItem(item.id, updates); if (success) { updateMenuItem(item.id, updates); successCount++; } else { errorCount++; } } catch (error) { console.error(`Error updating item ${item.name}:`, error); errorCount++; } } if (successCount > 0) { setEditableItems(prev => prev.map(item => { const wasChanged = changedItems.some(changed => changed.id === item.id); if (wasChanged && successCount > 0) { return { ...item, isEditing: false, hasChanges: false, originalData: { ...item, isEditing: false, isSelected: false, hasChanges: false, originalData: item.originalData } }; } return item; })); toast.success(`${successCount} פריטים עודכנו בהצלחה`); } if (errorCount > 0) toast.error(`${errorCount} פריטים נכשלו בעדכון`); } catch (error) { console.error('Error saving all changes:', error); toast.error('שגיאה בשמירת השינויים'); } finally { setIsLoading(false); } };
+  const updateItemField = (itemId: string, field: keyof MenuItem, value: any) => { setEditableItems(prev => prev.map(item => { if (item.id === itemId) { const updatedItem = { ...item, [field]: value }; const originalForComparison = { ...item.originalData }; const currentForComparison = { ...updatedItem, isSelected: false, hasChanges: false, originalData: undefined }; delete (currentForComparison as any).isSelected; delete (currentForComparison as any).hasChanges; delete (currentForComparison as any).originalData; const hasChanges = JSON.stringify(originalForComparison) !== JSON.stringify(currentForComparison); return { ...updatedItem, hasChanges }; } return item; })); };
+  const saveAllChanges = async () => { const changedItems = editableItems.filter(item => item.hasChanges); if (changedItems.length === 0) return; setIsLoading(true); let successCount = 0; let errorCount = 0; try { for (const item of changedItems) { try { const updates = { name: item.name, category: item.category, quantity: item.quantity, notes: item.notes, isRequired: item.isRequired }; const success = await FirebaseService.updateMenuItem(item.id, updates); if (success) { updateMenuItem(item.id, updates); successCount++; } else { errorCount++; } } catch (error) { console.error(`Error updating item ${item.name}:`, error); errorCount++; } } if (successCount > 0) { setEditableItems(prev => prev.map(item => { const wasChanged = changedItems.some(changed => changed.id === item.id); if (wasChanged && successCount > 0) { const freshItemData = menuItems.find(mi => mi.id === item.id) || item; return { ...item, hasChanges: false, originalData: freshItemData }; } return item; })); toast.success(`${successCount} פריטים עודכנו בהצלחה`); } if (errorCount > 0) toast.error(`${errorCount} פריטים נכשלו בעדכון`); } catch (error) { console.error('Error saving all changes:', error); toast.error('שגיאה בשמירת השינויים'); } finally { setIsLoading(false); } };
   const executeBulkAction = async () => { const selectedItems = filteredItems.filter(item => item.isSelected); if (selectedItems.length === 0) { toast.error('יש לבחור פריטים לפעולה'); return; } if (bulkAction === 'cancel_assignments') { const assignedItemsToCancel = selectedItems.filter(item => assignments.some(a => a.menuItemId === item.id)); if (assignedItemsToCancel.length === 0) { toast.error('לא נבחרו פריטים משובצים לביטול.'); setBulkAction(null); return; } if (!confirm(`האם אתה בטוח שברצונך לבטל ${assignedItemsToCancel.length} שיבוצים?`)) return; setIsLoading(true); let successCount = 0; let errorCount = 0; try { const allAssignments = [...assignments]; for (const item of assignedItemsToCancel) { try { const assignmentsToCancel = allAssignments.filter(a => a.menuItemId === item.id); for (const assignment of assignmentsToCancel) { await FirebaseService.deleteAssignment(assignment.id); deleteAssignment(assignment.id); } const menuItemUpdates = { assignedTo: undefined, assignedToName: undefined, assignedAt: undefined }; const updateSuccess = await FirebaseService.updateMenuItem(item.id, menuItemUpdates, true); if (updateSuccess) { updateMenuItem(item.id, menuItemUpdates); successCount++; } else { errorCount++; } } catch (error) { console.error(`Error canceling assignment for item ${item.name}:`, error); errorCount++; } } if (successCount > 0) toast.success(`בוטלו ${successCount} שיבוצים`); if (errorCount > 0) toast.error(`ביטול נכשל עבור ${errorCount} שיבוצים`); } finally { setIsLoading(false); setBulkAction(null); } return; } if (bulkAction === 'delete') { if (!confirm(`האם אתה בטוח שברצונך למחוק ${selectedItems.length} פריטים?`)) return; setIsLoading(true); let successCount = 0; let errorCount = 0; try { for (const item of selectedItems) { try { const success = await FirebaseService.deleteMenuItem(item.id); if (success) { deleteMenuItem(item.id); successCount++; } else { errorCount++; } } catch (error) { console.error(`Error deleting item ${item.name}:`, error); errorCount++; } } if (successCount > 0) toast.success(`${successCount} פריטים נמחקו בהצלחה`); if (errorCount > 0) toast.error(`${errorCount} פריטים נכשלו במחיקה`); } catch (error) { console.error('Error in bulk delete:', error); toast.error('שגיאה במחיקת הפריטים'); } finally { setIsLoading(false); setBulkAction(null); } } else if (bulkAction === 'category') { setIsLoading(true); let successCount = 0; let errorCount = 0; try { for (const item of selectedItems) { try { const success = await FirebaseService.updateMenuItem(item.id, { category: bulkCategory }); if (success) { updateMenuItem(item.id, { category: bulkCategory }); successCount++; } else { errorCount++; } } catch (error) { console.error(`Error updating category for item ${item.name}:`, error); errorCount++; } } if (successCount > 0) toast.success(`קטגוריה עודכנה עבור ${successCount} פריטים`); if (errorCount > 0) toast.error(`${errorCount} פריטים נכשלו בעדכון`); } catch (error) { console.error('Error in bulk category update:', error); toast.error('שגיאה בעדכון הקטגוריה'); } finally { setIsLoading(false); setBulkAction(null); } } else if (bulkAction === 'required') { setIsLoading(true); let successCount = 0; let errorCount = 0; try { for (const item of selectedItems) { try { const success = await FirebaseService.updateMenuItem(item.id, { isRequired: bulkRequired }); if (success) { updateMenuItem(item.id, { isRequired: bulkRequired }); successCount++; } else { errorCount++; } } catch (error) { console.error(`Error updating required status for item ${item.name}:`, error); errorCount++; } } if (successCount > 0) toast.success(`סטטוס חובה עודכן עבור ${successCount} פריטים`); if (errorCount > 0) toast.error(`${errorCount} פריטים נכשלו בעדכון`); } catch (error) { console.error('Error in bulk required update:', error); toast.error('שגיאה בעדכון סטטוס החובה'); } finally { setIsLoading(false); setBulkAction(null); } } };
   const getEventName = (eventId: string) => { const event = events.find(e => e.id === eventId); return event ? event.title : 'אירוע לא ידוע'; };
   const getItemAssignment = (itemId: string) => { return assignments.find(a => a.menuItemId === itemId); };
+
+  const handleAssignItem = async (itemId: string, userId: string, eventId: string) => {
+    if (!userId) return;
+    const user = users.find(u => u.id === userId);
+    if (!user) {
+      toast.error("משתמש לא נמצא");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const newAssignment: Omit<Assignment, 'id'> = {
+        userId: user.id,
+        userName: user.name,
+        menuItemId: itemId,
+        eventId: eventId,
+        createdAt: Date.now(),
+        status: 'assigned',
+      };
+      
+      const assignmentId = await FirebaseService.addAssignment(newAssignment);
+      addAssignment({ ...newAssignment, id: assignmentId });
+
+      // Also update the menu item itself to reflect assignment
+      const menuItemUpdates = { assignedTo: user.id, assignedToName: user.name, assignedAt: Date.now() };
+      await FirebaseService.updateMenuItem(itemId, menuItemUpdates, true);
+      updateMenuItem(itemId, menuItemUpdates);
+
+      toast.success(`"${user.name}" שובץ בהצלחה`);
+    } catch (error) {
+      console.error("Error assigning item:", error);
+      toast.error("שגיאה בשיבוץ הפריט");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCancelAssignment = async (assignmentId: string, menuItemId: string) => {
+    if (!confirm('האם לבטל את השיבוץ?')) return;
+    setIsLoading(true);
+    try {
+      await FirebaseService.deleteAssignment(assignmentId);
+      deleteAssignment(assignmentId);
+
+      const menuItemUpdates = { assignedTo: undefined, assignedToName: undefined, assignedAt: undefined };
+      await FirebaseService.updateMenuItem(menuItemId, menuItemUpdates, true);
+      updateMenuItem(menuItemId, menuItemUpdates);
+
+      toast.success("השיבוץ בוטל");
+    } catch (error) {
+      console.error("Error canceling assignment:", error);
+      toast.error("שגיאה בביטול השיבוץ");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -242,7 +312,6 @@ export function BulkItemsManager({ onBack }: BulkItemsManagerProps) {
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">הערות</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">חובה</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">שיבוץ</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">פעולות</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -251,14 +320,33 @@ export function BulkItemsManager({ onBack }: BulkItemsManagerProps) {
                 return (
                 <tr key={item.id} className={`${item.hasChanges ? 'bg-yellow-50' : ''} ${item.isSelected ? 'bg-blue-50' : ''}`}>
                   <td className="px-4 py-3"><button onClick={() => toggleItemSelection(item.id)} className="flex items-center">{item.isSelected ? (<CheckSquare className="h-4 w-4 text-blue-600" />) : (<Square className="h-4 w-4 text-gray-400" />)}</button></td>
-                  <td className="px-4 py-3">{item.isEditing ? (<input type="text" value={item.name} onChange={(e) => updateItemField(item.id, 'name', e.target.value)} className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />) : (<span className="font-medium text-gray-900">{item.name}</span>)}</td>
+                  <td className="px-4 py-3"><input type="text" value={item.name} onChange={(e) => updateItemField(item.id, 'name', e.target.value)} className="w-full min-w-[150px] px-2 py-1 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded text-sm bg-transparent focus:bg-white transition-colors" /></td>
                   <td className="px-4 py-3"><span className="text-sm text-gray-600">{getEventName(item.eventId)}</span></td>
-                  <td className="px-4 py-3">{item.isEditing ? (<select value={item.category} onChange={(e) => updateItemField(item.id, 'category', e.target.value as MenuCategory)} className="w-full px-2 py-1 border border-gray-300 rounded text-sm">{categoryOptions.map(option => (<option key={option.value} value={option.value}>{option.label}</option>))}</select>) : (<span className="text-sm text-gray-600">{categoryOptions.find(opt => opt.value === item.category)?.label}</span>)}</td>
-                  <td className="px-4 py-3">{item.isEditing ? (<input type="number" min="1" max="100" value={item.quantity} onChange={(e) => updateItemField(item.id, 'quantity', parseInt(e.target.value) || 1)} className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />) : (<span className="text-sm text-gray-600">{item.quantity}</span>)}</td>
-                  <td className="px-4 py-3">{item.isEditing ? (<input type="text" value={item.notes || ''} onChange={(e) => updateItemField(item.id, 'notes', e.target.value || undefined)} className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />) : (<span className="text-sm text-gray-600">{item.notes || '-'}</span>)}</td>
-                  <td className="px-4 py-3">{item.isEditing ? (<input type="checkbox" checked={item.isRequired} onChange={(e) => updateItemField(item.id, 'isRequired', e.target.checked)} className="rounded border-gray-300 text-red-600 focus:ring-red-500" />) : (<span className={`px-2 py-1 rounded-full text-xs ${item.isRequired ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>{item.isRequired ? 'חובה' : 'רגיל'}</span>)}</td>
-                  <td className="px-4 py-3">{assignment ? (<div><span className="text-sm font-medium text-green-700">{assignment.userName}</span><div className="text-xs text-gray-500">משובץ</div></div>) : (<span className="text-sm text-gray-500">זמין</span>)}</td>
-                  <td className="px-4 py-3"><div className="flex items-center space-x-2 rtl:space-x-reverse">{item.isEditing ? (<><button onClick={() => saveItem(item.id)} disabled={!item.hasChanges || isLoading} className="p-1 text-green-600 hover:text-green-700 disabled:text-gray-400" title="שמור"><Save className="h-4 w-4" /></button><button onClick={() => cancelEditing(item.id)} className="p-1 text-gray-600 hover:text-gray-700" title="ביטול"><X className="h-4 w-4" /></button></>) : (<button onClick={() => startEditing(item.id)} className="p-1 text-blue-600 hover:text-blue-700" title="ערוך"><Edit className="h-4 w-4" /></button>)}</div></td>
+                  <td className="px-4 py-3"><select value={item.category} onChange={(e) => updateItemField(item.id, 'category', e.target.value as MenuCategory)} className="w-full min-w-[120px] px-2 py-1 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded text-sm bg-transparent focus:bg-white transition-colors">{categoryOptions.map(option => (<option key={option.value} value={option.value}>{option.label}</option>))}</select></td>
+                  <td className="px-4 py-3"><input type="number" min="1" max="100" value={item.quantity} onChange={(e) => updateItemField(item.id, 'quantity', parseInt(e.target.value) || 1)} className="w-20 px-2 py-1 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded text-sm bg-transparent focus:bg-white transition-colors" /></td>
+                  <td className="px-4 py-3"><input type="text" value={item.notes || ''} onChange={(e) => updateItemField(item.id, 'notes', e.target.value || undefined)} className="w-full min-w-[150px] px-2 py-1 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded text-sm bg-transparent focus:bg-white transition-colors" /></td>
+                  <td className="px-4 py-3 text-center"><input type="checkbox" checked={item.isRequired} onChange={(e) => updateItemField(item.id, 'isRequired', e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer" /></td>
+                  <td className="px-4 py-3">
+                    {assignment ? (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-green-700">{assignment.userName}</span>
+                        <button onClick={() => handleCancelAssignment(assignment.id, item.id)} className="p-1 text-red-500 hover:text-red-700" title="בטל שיבוץ">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <select 
+                        onChange={(e) => handleAssignItem(item.id, e.target.value, item.eventId)}
+                        disabled={filterEvent === 'all'}
+                        className="w-full min-w-[120px] px-2 py-1 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded text-sm bg-transparent focus:bg-white transition-colors"
+                      >
+                        <option value="">בחר לשיבוץ...</option>
+                        {eventUsers.map(user => (
+                          <option key={user.id} value={user.id}>{user.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </td>
                 </tr>
               )})}
             </tbody>

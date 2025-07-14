@@ -44,12 +44,10 @@ export interface Assignment {
   menuItemId: string;
   userId: string;
   userName: string;
-  userPhone?: string;
-  quantity: number;
   notes?: string;
-  status: 'pending' | 'confirmed' | 'completed';
-  assignedAt: number;
-  updatedAt: number;
+  status: 'pending' | 'confirmed' | 'completed' | 'assigned';
+  createdAt: number;
+  updatedAt?: number;
 }
 
 export type MenuCategory = 'starter' | 'main' | 'dessert' | 'drink' | 'other';
