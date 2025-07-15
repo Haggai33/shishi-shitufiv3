@@ -1,5 +1,4 @@
 import { ref, push, set, onValue, off, remove, update, get, DataSnapshot } from 'firebase/database';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { database, auth } from '../lib/firebase';
 import { isCurrentlyLoggingOut } from '../hooks/useAuth';
@@ -139,33 +138,19 @@ export class FirebaseService {
         }
       }
 
-      // 4. Delete the admin user from the 'admins' and 'users' tables
+      // 4. Delete the admin user from the 'admins' table
       updates[`/admins/${uid}`] = null;
-      updates[`/users/${uid}`] = null; // Also remove from the general users list
-      console.log(`Marking admin ${uid} for deletion from Realtime Database.`);
+      console.log(`Marking admin ${uid} for deletion.`);
 
-      // 5. Perform all database updates in a single atomic operation
+      // 5. Perform all updates in a single atomic operation
       if (Object.keys(updates).length > 0) {
         await update(ref(database), updates);
-        console.log('Atomic database update completed successfully.');
+        console.log('Atomic update completed successfully.');
       } else {
-        console.log('No related data found to clean up. Only deleting admin entry from database.');
+        console.log('No related data found to clean up. Only deleting admin entry.');
+        // Fallback for safety, though the atomic update handles this.
         const adminRef = ref(database, `admins/${uid}`);
         await remove(adminRef);
-      }
-
-      // 6. **CRITICAL STEP**: Call a Cloud Function to delete the user from Firebase Auth.
-      // This requires a backend implementation because client-side SDKs cannot delete other users.
-      console.log(`Calling Cloud Function to delete user ${uid} from Firebase Authentication.`);
-      try {
-        const functions = getFunctions();
-        const deleteUser = httpsCallable(functions, 'deleteUser');
-        await deleteUser({ uid });
-        console.log(`Successfully triggered Cloud Function to delete user ${uid}.`);
-      } catch (error) {
-        console.error('Error calling deleteUser Cloud Function:', error);
-        // Note: The database entry was already removed. Manual cleanup of the Auth user might be needed.
-        throw new Error('שגיאה במחיקת המשתמש ממערכת האימות. המשתמש נמחק מהאפליקציה אך ייתכן שיוכל להתחבר שוב. יש לדווח למנהל המערכת.');
       }
       
       console.log('Admin user and all related data deleted successfully:', uid);
@@ -579,21 +564,49 @@ export class FirebaseService {
   }
 
   // Assignments
-  static async addAssignment(assignment: Omit<Assignment, 'id'>): Promise<string> {
+  static async createAssignment(assignment: Omit<Assignment, 'id'>): Promise<string> {
     try {
-      const assignmentsRef = ref(database, 'assignments');
-      const newAssignmentRef = push(assignmentsRef);
+      const menuItemRef = ref(database, `menuItems/${assignment.menuItemId}`);
       
-      const cleanedAssignment = cleanObject({ 
-        ...assignment, 
-        id: newAssignmentRef.key!,
-      });
-
-      await set(newAssignmentRef, cleanedAssignment);
-      return newAssignmentRef.key!;
+      // קודם כל, קרא את המצב הנוכחי של הפריט
+      const snapshot = await get(menuItemRef);
+      const currentMenuItem = snapshot.val();
+  
+      if (!currentMenuItem) {
+        throw new Error('פריט התפריט לא נמצא');
+      }
+      if (currentMenuItem.assignedTo) {
+        throw new Error('מצטערים, מישהו אחר כבר הספיק לשבץ את הפריט הזה');
+      }
+  
+      // הכן את כל העדכונים שיבוצעו יחד
+      const newAssignmentRef = push(ref(database, 'assignments'));
+      const newAssignmentKey = newAssignmentRef.key!;
+      
+      const updates: { [key: string]: unknown } = {};
+  
+      // עדכון 1: שייך את הפריט למשתמש
+      updates[`/menuItems/${assignment.menuItemId}/assignedTo`] = assignment.userId;
+      updates[`/menuItems/${assignment.menuItemId}/assignedToName`] = assignment.userName;
+      updates[`/menuItems/${assignment.menuItemId}/assignedAt`] = assignment.assignedAt || Date.now();
+  
+      // עדכון 2: צור את רשומת השיבוץ
+      updates[`/assignments/${newAssignmentKey}`] = {
+        ...assignment,
+        id: newAssignmentKey,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+  
+      // בצע את שני העדכונים בפעולה אטומית אחת
+      await update(ref(database), updates);
+  
+      return newAssignmentKey;
+  
     } catch (error) {
-      console.error('Error adding assignment:', error);
-      throw new Error('שגיאה בהוספת השיבוץ');
+      console.error('Error creating assignment:', error);
+      // העבר את השגיאה המקורית כדי שה-UI יציג אותה
+      throw error;
     }
   }
 
