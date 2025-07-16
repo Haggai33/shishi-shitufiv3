@@ -1,77 +1,74 @@
+// src/hooks/useAuth.ts
+
 import { useState, useEffect } from 'react';
-import { onAuthStateChanged, signOut, User as AuthUser } from 'firebase/auth';
+import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
+// התיקון כאן: הוספנו את 'set' לרשימת הייבוא
+import { ref, get, set } from 'firebase/database'; 
 import toast from 'react-hot-toast';
 import { auth, database } from '../lib/firebase';
 import { useStore } from '../store/useStore';
-import { FirebaseService } from '../services/firebaseService';
-import { ref, set, get } from 'firebase/database';
 import { User } from '../types';
 
-export let isCurrentlyLoggingOut = false;
-
+/**
+ * Hook מותאם לניהול מצב האימות באפליקציית Multi-Tenant.
+ * מאזין לשינויים במצב ההתחברות של המשתמש, מסנכרן את המידע עם ה-Store הגלובלי,
+ * ומספק פונקציית התנתקות.
+ */
 export function useAuth() {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { setUserAdminStatus, clearAndUnsubscribeListeners } = useStore();
+  
+  const { setUser, setOrganizerEvents, clearCurrentEvent } = useStore();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: AuthUser | null) => {
-      if (firebaseUser) {
-        const userRef = ref(database, `users/${firebaseUser.uid}`);
-        const snapshot = await get(userRef);
-        const isAdmin = await FirebaseService.checkAdminStatus(firebaseUser.uid);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setIsLoading(true);
+      if (user) {
+        setFirebaseUser(user);
+        
+        const userProfileRef = ref(database, `users/${user.uid}`);
+        const snapshot = await get(userProfileRef);
 
-        if (!snapshot.exists()) {
-          const newUser: User = {
-            id: firebaseUser.uid,
-            name: firebaseUser.displayName || '',
-            email: firebaseUser.email || '',
-            createdAt: Date.now(),
-            isAdmin,
-          };
-          await set(userRef, newUser);
-          useStore.getState().setUser(newUser);
+        if (snapshot.exists()) {
+          setUser(snapshot.val() as User);
         } else {
-          const existingUser = snapshot.val();
-          if (existingUser.isAdmin !== isAdmin) {
-            await set(userRef, { ...existingUser, isAdmin });
-            useStore.getState().setUser({ ...existingUser, isAdmin });
-          } else {
-            useStore.getState().setUser(existingUser);
-          }
+          // מקרה קצה: משתמש קיים ב-Auth אבל אין לו פרופיל ב-DB.
+          // זה יכול לקרות אם תהליך ההרשמה נכשל באמצע.
+          // ניצור לו פרופיל בסיסי.
+          const newUserProfile: User = {
+            id: user.uid,
+            name: user.displayName || 'מארגן חדש',
+            email: user.email || '',
+            createdAt: Date.now(),
+          };
+          // כאן השתמשנו ב-'set' שהיה חסר
+          await set(userProfileRef, newUserProfile); 
+          setUser(newUserProfile);
         }
-        setUser(firebaseUser);
-        setUserAdminStatus(isAdmin);
       } else {
+        setFirebaseUser(null);
         setUser(null);
-        setUserAdminStatus(false);
-        clearAndUnsubscribeListeners();
+        setOrganizerEvents([]);
+        clearCurrentEvent();
       }
-      
       setIsLoading(false);
     });
 
-    return unsubscribe;
-  }, [setUserAdminStatus, clearAndUnsubscribeListeners]);
+    return () => unsubscribe();
+  }, [setUser, setOrganizerEvents, clearCurrentEvent]);
 
   const logout = async () => {
-    isCurrentlyLoggingOut = true;
     try {
-      clearAndUnsubscribeListeners();
       await signOut(auth);
       toast.success('התנתקת בהצלחה');
     } catch (error) {
       console.error('Error signing out:', error);
       toast.error('שגיאה בעת ההתנתקות');
-    } finally {
-      setTimeout(() => {
-        isCurrentlyLoggingOut = false;
-      }, 500);
     }
   };
 
   return {
-    user,
+    user: firebaseUser,
     isLoading,
     logout,
   };
