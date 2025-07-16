@@ -7,7 +7,7 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
-  // עדכון הבלוק הקיים או הוספתו
+  // ההגדרה פועלת רק על תהליך הבנייה (build)
   build: {
     esbuild: {
       drop: ['console', 'debugger'],
