@@ -7,13 +7,10 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  // עדכון הבלוק הקיים או הוספתו
   build: {
-    terserOptions: {
-      compress: {
-        drop_console: true, // מסיר את כל קריאות ה-console.*
-        drop_debugger: true, // מסיר את כל קריאות ה-debugger
-      },
+    esbuild: {
+      drop: ['console', 'debugger'],
     },
   },
-  // -------------------------
 });
