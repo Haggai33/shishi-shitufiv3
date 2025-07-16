@@ -9,10 +9,9 @@ import { ShishiEvent, EventDetails } from '../types';
 import { toast } from 'react-hot-toast';
 import { Plus, LogOut, Calendar, MapPin, Clock, Share2, Eye, Trash2, ChefHat, Home } from 'lucide-react';
 
-// --- רכיב כרטיס אירוע ---
+// --- רכיב כרטיס אירוע (ללא שינוי) ---
 const EventCard: React.FC<{ event: ShishiEvent, onDelete: (eventId: string, title: string) => void }> = ({ event, onDelete }) => {
   const navigate = useNavigate();
-  // הכתובת המלאה לשיתוף האירוע
   const eventUrl = `${window.location.origin}/event/${event.organizerId}/${event.id}`;
 
   const copyToClipboard = () => {
@@ -55,7 +54,7 @@ const EventCard: React.FC<{ event: ShishiEvent, onDelete: (eventId: string, titl
   );
 };
 
-// --- רכיב טופס יצירת אירוע ---
+// --- רכיב טופס יצירת אירוע (ללא שינוי) ---
 const EventFormModal: React.FC<{ onClose: () => void, onEventCreated: () => void }> = ({ onClose, onEventCreated }) => {
     const user = useStore(state => state.user);
     const [details, setDetails] = useState<EventDetails>({
@@ -82,7 +81,7 @@ const EventFormModal: React.FC<{ onClose: () => void, onEventCreated: () => void
         try {
             await FirebaseService.createEvent(user.id, details);
             toast.success("האירוע נוצר בהצלחה!");
-            onEventCreated(); // קריאה לפונקציה שמרעננת את הדאשבורד
+            onEventCreated();
             onClose();
         } catch (error) {
             console.error("Error creating event:", error);
@@ -125,10 +124,13 @@ const EventFormModal: React.FC<{ onClose: () => void, onEventCreated: () => void
 };
 
 
-// --- רכיב הדאשבורד הראשי ---
+// --- רכיב הדאשבורד הראשי (לאחר שכתוב) ---
 const DashboardPage: React.FC = () => {
-  const { user: authUser, isLoading: isAuthLoading, logout } = useAuth();
-  const { organizerEvents, setOrganizerEvents, user } = useStore();
+  const { logout } = useAuth(); // <<< שינוי: מספיק לקבל רק את פונקציית ההתנתקות
+  const user = useStore(state => state.user); // <<< שינוי: אנחנו צריכים רק את המשתמש מה-store
+
+  // <<< שינוי: ניהול מצב האירועים הופך למקומי בקומפוננטה
+  const [events, setEvents] = useState<ShishiEvent[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
@@ -136,8 +138,8 @@ const DashboardPage: React.FC = () => {
     if (user) {
       setIsLoadingEvents(true);
       try {
-        const events = await FirebaseService.getEventsByOrganizer(user.id);
-        setOrganizerEvents(events);
+        const fetchedEvents = await FirebaseService.getEventsByOrganizer(user.id);
+        setEvents(fetchedEvents); // <<< שינוי: מעדכנים את המצב המקומי
       } catch (error) {
         console.error("Failed to fetch events:", error);
         toast.error("שגיאה בטעינת האירועים.");
@@ -145,7 +147,7 @@ const DashboardPage: React.FC = () => {
         setIsLoadingEvents(false);
       }
     }
-  }, [user, setOrganizerEvents]);
+  }, [user]); // <<< שינוי: תלות ב-user בלבד
 
   useEffect(() => {
     fetchEvents();
@@ -157,7 +159,7 @@ const DashboardPage: React.FC = () => {
         try {
             await FirebaseService.deleteEvent(user.id, eventId);
             toast.success("האירוע נמחק בהצלחה");
-            fetchEvents(); // Refresh the list
+            fetchEvents(); // רענון הרשימה המקומית
         } catch (error) {
             toast.error("שגיאה במחיקת האירוע");
             console.error(error);
@@ -165,13 +167,7 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  if (isAuthLoading || (isLoadingEvents && !organizerEvents.length)) {
-    return (
-        <div className="flex items-center justify-center h-screen bg-gray-50">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500"></div>
-        </div>
-    );
-  }
+  // if (isAuthLoading) ... אין צורך בבדיקה זו יותר, App.tsx מטפל בה.
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -190,7 +186,7 @@ const DashboardPage: React.FC = () => {
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center mb-6 px-4 sm:px-0">
-            <h2 className="text-xl font-semibold text-gray-700">האירועים שלי ({organizerEvents.length})</h2>
+            <h2 className="text-xl font-semibold text-gray-700">האירועים שלי ({events.length})</h2> {/* <<< שינוי: שימוש ב-events המקומי */}
             <button onClick={() => setShowCreateModal(true)} className="flex items-center bg-orange-500 text-white px-4 py-2 rounded-lg shadow hover:bg-orange-600 transition-colors">
                 <Plus size={20} className="ml-2" />
                 צור אירוע חדש
@@ -199,9 +195,9 @@ const DashboardPage: React.FC = () => {
 
         {isLoadingEvents ? (
              <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div></div>
-        ) : organizerEvents.length > 0 ? (
+        ) : events.length > 0 ? ( // <<< שינוי: שימוש ב-events המקומי
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {organizerEvents.map(event => (
+                {events.map(event => ( // <<< שינוי: שימוש ב-events המקומי
                     <EventCard key={event.id} event={event} onDelete={handleDeleteEvent} />
                 ))}
             </div>

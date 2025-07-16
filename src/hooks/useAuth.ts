@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
-// התיקון כאן: הוספנו את 'set' לרשימת הייבוא
 import { ref, get, set } from 'firebase/database'; 
 import toast from 'react-hot-toast';
 import { auth, database } from '../lib/firebase';
@@ -18,7 +17,8 @@ export function useAuth() {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
-  const { setUser, setOrganizerEvents, clearCurrentEvent } = useStore();
+  // <<< שינוי: הסרנו את setOrganizerEvents
+  const { setUser, clearCurrentEvent } = useStore();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -32,30 +32,27 @@ export function useAuth() {
         if (snapshot.exists()) {
           setUser(snapshot.val() as User);
         } else {
-          // מקרה קצה: משתמש קיים ב-Auth אבל אין לו פרופיל ב-DB.
-          // זה יכול לקרות אם תהליך ההרשמה נכשל באמצע.
-          // ניצור לו פרופיל בסיסי.
           const newUserProfile: User = {
             id: user.uid,
             name: user.displayName || 'מארגן חדש',
             email: user.email || '',
             createdAt: Date.now(),
           };
-          // כאן השתמשנו ב-'set' שהיה חסר
           await set(userProfileRef, newUserProfile); 
           setUser(newUserProfile);
         }
       } else {
         setFirebaseUser(null);
         setUser(null);
-        setOrganizerEvents([]);
+        // <<< שינוי: הסרנו את הקריאה ל-setOrganizerEvents([])
         clearCurrentEvent();
       }
       setIsLoading(false);
     });
 
     return () => unsubscribe();
-  }, [setUser, setOrganizerEvents, clearCurrentEvent]);
+  // <<< שינוי: הסרנו את setOrganizerEvents ממערך התלויות
+  }, [setUser, clearCurrentEvent]);
 
   const logout = async () => {
     try {

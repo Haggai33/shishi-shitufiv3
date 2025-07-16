@@ -3,16 +3,14 @@
 import { create } from 'zustand';
 import { User, ShishiEvent, MenuItem, Assignment, Participant } from '../types';
 
-// הגדרת המצב הגלובלי של האפליקציה
+// הגדרת המצב הגלובלי של האפליקציה - עכשיו הוא פשוט יותר
 interface AppState {
-  user: User | null; // המשתמש המחובר (תמיד יהיה מארגן)
-  organizerEvents: ShishiEvent[]; // רשימת האירועים של המארגן (עבור הדאשבורד)
+  user: User | null; // המשתמש המחובר (מארגן או אורח אנונימי)
   currentEvent: ShishiEvent | null; // האירוע הספציפי שבו המשתמש צופה כרגע
   isLoading: boolean;
   
   // פעולות לעדכון המצב
   setUser: (user: User | null) => void;
-  setOrganizerEvents: (events: ShishiEvent[]) => void;
   setCurrentEvent: (event: ShishiEvent | null) => void;
   setLoading: (loading: boolean) => void;
   clearCurrentEvent: () => void;
@@ -21,15 +19,13 @@ interface AppState {
 export const useStore = create<AppState>((set) => ({
   // מצב התחלתי
   user: null,
-  organizerEvents: [],
   currentEvent: null,
   isLoading: true, // מתחילים במצב טעינה
 
   // הגדרת הפעולות
   setUser: (user) => set({ user }),
   
-  setOrganizerEvents: (events) => set({ organizerEvents: events, isLoading: false }),
-  
+  // פעולה זו תקבל עכשיו את כל אובייקט האירוע מ-Firebase
   setCurrentEvent: (event) => set({ currentEvent: event, isLoading: false }),
   
   setLoading: (loading) => set({ isLoading: loading }),
@@ -39,8 +35,8 @@ export const useStore = create<AppState>((set) => ({
 }));
 
 // --- Selectors ---
-// פונקציות עזר נוחות לשליפת נתונים מקוננים מהאירוע הנוכחי.
-// זה מונע לוגיקה מסובכת בתוך הרכיבים.
+// הסלקטורים נשארים כמעט זהים, אך עכשיו הם תמיד יעבדו על נתונים נקיים ומדויקים
+// מתוך currentEvent, ללא צורך בסינונים מורכבים.
 
 /**
  * סלקטור שמחזיר מערך של פריטי תפריט מהאירוע הנוכחי.
@@ -67,7 +63,6 @@ export const selectAssignments = (state: AppState): Assignment[] => {
   return Object.entries(event.assignments).map(([id, assignment]) => ({
     ...(assignment as Omit<Assignment, 'id'>),
     id,
-    eventId: event.id,
   }));
 };
 
