@@ -7,4 +7,13 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  build: {
+    terserOptions: {
+      compress: {
+        drop_console: true, // מסיר את כל קריאות ה-console.*
+        drop_debugger: true, // מסיר את כל קריאות ה-debugger
+      },
+    },
+  },
+  // -------------------------
 });
