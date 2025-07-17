@@ -278,10 +278,19 @@ export class FirebaseService {
       const newItemId = newItemRef.key!;
       console.log('🆔 Generated item ID:', newItemId);
       
+      // נקה ערכי undefined לפני השמירה
       const finalItemData = {
         ...itemData,
-        id: newItemId
+        id: newItemId,
+        notes: itemData.notes || null // המר undefined ל-null או הסר לגמרי
       };
+      
+      // הסר שדות עם ערכי null/undefined
+      Object.keys(finalItemData).forEach(key => {
+        if (finalItemData[key as keyof typeof finalItemData] === undefined) {
+          delete finalItemData[key as keyof typeof finalItemData];
+        }
+      });
       
       console.log('📋 Final item data to save:', finalItemData);
       console.log('💾 Saving to Firebase...');
@@ -328,6 +337,11 @@ export class FirebaseService {
         ...itemData,
         id: newItemId
       };
+      
+      // נקה ערכי undefined
+      if (!finalItemData.notes) {
+        delete finalItemData.notes;
+      }
 
       // אם יש שיבוץ, הוסף את פרטי השיבוץ לפריט
       if (assignToUserId) {
@@ -344,7 +358,7 @@ export class FirebaseService {
           userId: assignToUserId,
           userName: assignToUserName,
           quantity: itemData.quantity,
-          notes: '',
+          notes: itemData.notes || '',
           status: 'confirmed',
           assignedAt: Date.now()
         };

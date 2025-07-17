@@ -146,12 +146,18 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
         name: formData.name.trim(),
         category: formData.category,
         quantity: formData.quantity,
-        notes: formData.notes.trim() || undefined,
+        notes: formData.notes.trim() || '',
         isRequired: false,
         createdAt: Date.now(),
         creatorId: authUser.uid,
         creatorName: finalUserName
       };
+      
+      // הסר שדה notes אם הוא ריק
+      if (!newItemData.notes) {
+        delete (newItemData as any).notes;
+      }
+      
       console.log('📋 New item data:', newItemData);
       console.log('🔗 Firebase path for item:', `events/${event.id}/menuItems`);
 
