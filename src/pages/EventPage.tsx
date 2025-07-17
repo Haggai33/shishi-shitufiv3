@@ -51,9 +51,64 @@ const CategorySelector: React.FC<{
                 <img src={details.icon} alt={details.name} className="w-20 h-20 mx-auto mb-3 object-contain" />
                 <h3 className="text-xl font-bold text-neutral-800 mb-2">{details.name}</h3>
                 <p className="text-center text-neutral-500 text-sm mb-4">{progress.assigned} / {progress.total} שובצו</p>
-                <div className="w-full bg-neutral-200 rounded-full h-2.5">
-                  <div className="h-2.5 rounded-full" style={{ width: `${percentage}%`, backgroundColor: details.color, transition: 'width 0.5s ease-in-out' }}></div>
-                </div>
+                  <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-2">שם הפריט*</label>
+                      <div className="relative">
+                          <ChefHat className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" />
+                          <input 
+                              type="text" 
+                              placeholder="למשל: עוגת גבינה" 
+                              value={item.name} 
+                              onChange={e => setItem({ ...item, name: e.target.value })} 
+                              className="w-full p-2 pr-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent" 
+                              required 
+                          />
+                      </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                      <div>
+                          <label className="block text-sm font-medium text-neutral-700 mb-2">קטגוריה*</label>
+                          <select 
+                              value={item.category} 
+                              onChange={e => setItem({ ...item, category: e.target.value as MenuCategory })} 
+                              className="w-full p-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
+                          >
+                              <option value="starter">מנה ראשונה</option>
+                              <option value="main">מנה עיקרית</option>
+                              <option value="dessert">קינוח</option>
+                              <option value="drink">משקה</option>
+                              <option value="other">אחר</option>
+                          </select>
+                      </div>
+                      <div>
+                          <label className="block text-sm font-medium text-neutral-700 mb-2">כמות*</label>
+                          <div className="relative">
+                              <Hash className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" />
+                              <input 
+                                  type="number" 
+                                  placeholder="1" 
+                                  value={item.quantity} 
+                                  onChange={e => setItem({ ...item, quantity: parseInt(e.target.value) || 1 })} 
+                                  className="w-full p-2 pr-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent" 
+                                  required 
+                                  min="1" 
+                              />
+                          </div>
+                      </div>
+                  </div>
+                  <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-2">הערות (אופציונלי)</label>
+                      <div className="relative">
+                          <MessageSquare className="absolute right-3 top-3 h-4 w-4 text-neutral-400" />
+                          <textarea 
+                              placeholder="לדוגמה: כשר, ללא בוטנים..." 
+                              value={item.notes} 
+                              onChange={e => setItem({ ...item, notes: e.target.value })} 
+                              className="w-full p-2 pr-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent" 
+                              rows={2} 
+                          />
+                      </div>
+                  </div>
               </div>
             </div>
           );
@@ -176,9 +231,47 @@ const AssignmentModal: React.FC<{ item: MenuItemType; organizerId: string; event
                 <div className="p-6">
                     <div className="bg-accent/10 p-4 rounded-lg mb-6 text-center"><p className="font-bold text-accent">{item.name}</p><p className="text-sm text-accent/80">כמות מוצעת: {item.quantity}</p></div>
                     <div className="space-y-4">
-                        {showNameInput && (<div><label className="block text-sm font-medium text-neutral-700 mb-2">שם מלא*</label><div className="relative"><UserIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" /><input type=\"text" value={participantName} onChange={e => setParticipantName(e.target.value)} placeholder="השם שיוצג לכולם\" className="w-full p-2 pr-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent" /></div></div>)}
-                        <div><label className="block text-sm font-medium text-neutral-700 mb-2">כמות שאביא*</label><div className="relative"><Hash className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" /><input type=\"number" value={quantity} onChange={e => setQuantity(parseInt(e.target.value, 10) || 1)} className="w-full p-2 pr-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent\" min="1" /></div></div>
-                        <div><label className="block text-sm font-medium text-neutral-700 mb-2">הערות (אופציונלי)</label><div className="relative"><MessageSquare className="absolute right-3 top-3 h-4 w-4 text-neutral-400" /><textarea value={notes} onChange={e => setNotes(e.target.value)} className="w-full p-2 pr-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent" rows={3} placeholder="לדוגמה: ללא גלוטן, טבעוני..." /></div></div>
+                        {showNameInput && (
+                            <div>
+                                <label className="block text-sm font-medium text-neutral-700 mb-2">שם מלא*</label>
+                                <div className="relative">
+                                    <UserIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" />
+                                    <input 
+                                        type="text" 
+                                        value={participantName} 
+                                        onChange={e => setParticipantName(e.target.value)} 
+                                        placeholder="השם שיוצג לכולם" 
+                                        className="w-full p-2 pr-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent" 
+                                    />
+                                </div>
+                            </div>
+                        )}
+                        <div>
+                            <label className="block text-sm font-medium text-neutral-700 mb-2">כמות שאביא*</label>
+                            <div className="relative">
+                                <Hash className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" />
+                                <input 
+                                    type="number" 
+                                    value={quantity} 
+                                    onChange={e => setQuantity(parseInt(e.target.value, 10) || 1)} 
+                                    className="w-full p-2 pr-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent" 
+                                    min="1" 
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-neutral-700 mb-2">הערות (אופציונלי)</label>
+                            <div className="relative">
+                                <MessageSquare className="absolute right-3 top-3 h-4 w-4 text-neutral-400" />
+                                <textarea 
+                                    value={notes} 
+                                    onChange={e => setNotes(e.target.value)} 
+                                    className="w-full p-2 pr-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent" 
+                                    rows={3} 
+                                    placeholder="לדוגמה: ללא גלוטן, טבעוני..." 
+                                />
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div className="bg-neutral-50 px-6 py-4 flex justify-end space-x-3 rtl:space-x-reverse rounded-b-xl">
