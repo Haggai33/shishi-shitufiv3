@@ -184,17 +184,16 @@ export function ImportItemsModal({ event, onClose }: ImportItemsModalProps) {
       for (const item of itemsToProcess) {
         try {
           const menuItemData: Omit<MenuItem, 'id'> = { 
-            eventId: event.id, 
             name: item.name, 
             category: item.category, 
             quantity: item.quantity, 
-            notes: item.notes, 
+            notes: item.notes || '', 
             isRequired: item.isRequired, 
             createdAt: Date.now(),
             creatorId: authUser?.uid || 'admin',
             creatorName: authUser?.displayName || 'Admin'
           };
-          const itemId = await FirebaseService.createMenuItem(menuItemData, true);
+          const itemId = await FirebaseService.addMenuItem(event.id, menuItemData);
           if (itemId) {
             newItemsForStore.push({ ...menuItemData, id: itemId });
             successCount++;
@@ -279,7 +278,7 @@ export function ImportItemsModal({ event, onClose }: ImportItemsModalProps) {
             <div className="bg-green-100 rounded-lg p-2"><Upload className="h-5 w-5 text-green-600" /></div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900">ייבוא פריטים</h2>
-              <p className="text-sm text-gray-600">{event.title}</p>
+              <p className="text-sm text-gray-600">{event.details.title}</p>
             </div>
           </div>
           <button onClick={onClose} disabled={isImporting} className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"><X className="h-5 w-5" /></button>

@@ -251,6 +251,7 @@ const AssignmentModal: React.FC<{
 
 // Import the UserMenuItemForm component
 import { UserMenuItemForm } from '../components/Events/UserMenuItemForm';
+import { ImportItemsModal } from '../components/Admin/ImportItemsModal';
 
 // --- Component: LoadingSpinner ---
 const LoadingSpinner: React.FC = () => (
@@ -292,6 +293,7 @@ const EventPage: React.FC = () => {
     const [modalState, setModalState] = useState<{ type: 'assign' | 'edit' | 'add-user-item'; item?: MenuItemType; assignment?: AssignmentType } | null>(null);
     const [itemToAssignAfterJoin, setItemToAssignAfterJoin] = useState<MenuItemType | null>(null);
     const [showNameModal, setShowNameModal] = useState(false);
+    const [showImportModal, setShowImportModal] = useState(false);
 
     const [searchTerm, setSearchTerm] = useState('');
     const [view, setView] = useState<'categories' | 'items'>('categories');
@@ -358,6 +360,7 @@ const EventPage: React.FC = () => {
 
     const participantName = participants.find(p => p.id === localUser?.uid)?.name || 'אורח';
     const isEventActive = currentEvent.details.isActive && !isEventPast(currentEvent.details.date, currentEvent.details.time);
+    const isOrganizer = localUser?.uid === currentEvent.organizerId;
 
     return (
         <div className="min-h-screen bg-background">
@@ -400,9 +403,16 @@ const EventPage: React.FC = () => {
                 )}
                 
                 <div className="mt-12 text-center">
-                    <button onClick={() => setModalState({ type: 'add-user-item' })} className="bg-success text-white px-8 py-3 rounded-lg shadow-lg hover:bg-success/90 transition-colors font-semibold text-lg">
-                        <Plus size={22} className="inline-block ml-2" />הוסף פריט משלך
-                    </button>
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        <button onClick={() => setModalState({ type: 'add-user-item' })} className="bg-success text-white px-8 py-3 rounded-lg shadow-lg hover:bg-success/90 transition-colors font-semibold text-lg">
+                            <Plus size={22} className="inline-block ml-2" />הוסף פריט משלך
+                        </button>
+                        {isOrganizer && (
+                            <button onClick={() => setShowImportModal(true)} className="bg-blue-500 text-white px-8 py-3 rounded-lg shadow-lg hover:bg-blue-600 transition-colors font-semibold text-lg">
+                                <Upload size={22} className="inline-block ml-2" />ייבא פריטים
+                            </button>
+                        )}
+                    </div>
                 </div>
             </main>
 
@@ -413,6 +423,12 @@ const EventPage: React.FC = () => {
                 <UserMenuItemForm 
                     event={currentEvent} 
                     onClose={() => setModalState(null)} 
+                />
+            )}
+            {showImportModal && currentEvent && (
+                <ImportItemsModal
+                    event={currentEvent}
+                    onClose={() => setShowImportModal(false)}
                 />
             )}
         </div>
