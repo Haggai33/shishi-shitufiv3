@@ -178,6 +178,8 @@ export class FirebaseService {
     eventId: string, 
     itemData: Omit<MenuItem, 'id'>
   ): Promise<string> {
+    console.log('Adding menu item:', { organizerId, eventId, itemData });
+    
     await this.ensureEventStructure(organizerId, eventId);
     
     const newItemRef = push(ref(database, `${this.eventPath(organizerId, eventId)}/menuItems`));
@@ -188,7 +190,10 @@ export class FirebaseService {
       id: newItemId
     };
     
+    console.log('Final item data:', finalItemData);
+    
     await set(newItemRef, finalItemData);
+    console.log('Menu item added successfully with ID:', newItemId);
     return newItemId;
   }
 
@@ -202,6 +207,8 @@ export class FirebaseService {
     assignToUserId: string | null,
     assignToUserName: string
   ): Promise<string> {
+    console.log('Adding menu item and assign:', { organizerId, eventId, itemData, assignToUserId, assignToUserName });
+    
     await this.ensureEventStructure(organizerId, eventId);
     
     const newItemRef = push(ref(database, `${this.eventPath(organizerId, eventId)}/menuItems`));
@@ -238,7 +245,9 @@ export class FirebaseService {
     
     updates[`${this.eventPath(organizerId, eventId)}/menuItems/${newItemId}`] = finalItemData;
     
+    console.log('Updates to apply:', updates);
     await update(ref(database), updates);
+    console.log('Menu item and assignment added successfully with ID:', newItemId);
     return newItemId;
   }
 
