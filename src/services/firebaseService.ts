@@ -141,75 +141,37 @@ export class FirebaseService {
    * מחזיר את כל האירועים של מארגן ספציפי
    */
   static async getEventsByOrganizer(organizerId: string): Promise<ShishiEvent[]> {
-    console.log('📋 STARTING getEventsByOrganizer');
+    console.log('📋 FirebaseService.getEventsByOrganizer - START');
     console.log('📥 organizerId:', organizerId);
-    
-    console.group('📋 FirebaseService.getEventsByOrganizer');
-    console.log('📥 Input parameters:', { organizerId });
     
     try {
       const eventsRef = ref(database, 'events');
-      console.log('🔍 Creating query for events collection');
-      console.log('🔍 Creating query for events collection');
-      console.log('🔍 Query path: events');
-      console.log('🔍 Filter: organizerId ==', organizerId);
+      console.log('🔍 Querying events collection with organizerId:', organizerId);
       
       const eventsQuery = query(eventsRef, orderByChild('organizerId'), equalTo(organizerId));
-      console.log('📡 Executing Firebase query...');
-      console.log('🔍 Query path:', 'events');
-      console.log('🔍 Query filter:', `organizerId == ${organizerId}`);
-      
-      console.log('📡 Executing Firebase query...');
       const snapshot = await get(eventsQuery);
-      console.log('📡 Firebase response received');
-      console.log('📊 Snapshot exists:', snapshot.exists());
-      console.log('📡 Firebase response received');
-      console.log('📊 Snapshot exists:', snapshot.exists());
+      
+      console.log('📡 Firebase response - exists:', snapshot.exists());
       
       if (snapshot.exists()) {
         const eventsData = snapshot.val();
-        console.log('📋 Raw events data:', eventsData);
-        console.log('📋 Raw events data:', eventsData);
-        console.log('📊 Raw data keys:', Object.keys(eventsData));
+        console.log('📋 Raw events data:', JSON.stringify(eventsData, null, 2));
         
         const events = Object.entries(eventsData).map(([id, event]) => ({
           id,
           ...(event as Omit<ShishiEvent, 'id'>)
         }));
         
-        console.log('✅ Processed events:', events);
-        console.log('📊 Events count:', events.length);
-        console.log('✅ Processed events:', events);
-        console.log('📊 Events count:', events.length);
+        console.log('✅ Processed events count:', events.length);
+        console.log('✅ First event sample:', events[0]);
         
-        // Log each event details
-        events.forEach((event, index) => {
-          console.log(`📋 Event ${index + 1}:`, {
-            id: event.id,
-            title: event.details?.title,
-            organizerId: event.organizerId,
-            organizerName: event.organizerName
-          });
-        });
-        
-        console.groupEnd();
         return events;
       }
       
-      console.log('📭 No events found for organizer');
-      console.log('📭 No events found for organizer');
-      console.groupEnd();
+      console.log('📭 No events found for organizer:', organizerId);
       return [];
     } catch (error) {
       console.error('❌ Error in getEventsByOrganizer:', error);
-      console.error('❌ Error in getEventsByOrganizer:', error);
-      console.error('📊 Error details:', {
-        message: error?.message,
-        code: error?.code,
-        stack: error?.stack,
-        organizerId
-      });
-      console.groupEnd();
       throw error;
     }
   }

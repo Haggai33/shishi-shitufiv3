@@ -176,29 +176,26 @@ const DashboardPage: React.FC = () => {
   };
 
   const fetchEvents = useCallback(async () => {
-    console.log('🔄 STARTING fetchEvents');
-    console.log('👤 Current user:', user);
+    console.log('🔄 DashboardPage.fetchEvents - START');
+    console.log('👤 Current user ID:', user?.id);
     
     if (!user) {
-      console.log('❌ No user found, skipping fetch');
+      console.log('❌ No user found');
       return;
     }
 
-    console.log('🔍 User ID:', user.id);
     setIsLoadingEvents(true);
     
     try {
-      console.log('📞 Calling FirebaseService.getEventsByOrganizer...');
+      console.log('📞 Calling FirebaseService.getEventsByOrganizer with ID:', user.id);
       const fetchedEvents = await FirebaseService.getEventsByOrganizer(user.id);
-      console.log('✅ Events fetched successfully:', fetchedEvents);
-      console.log('📊 Number of events:', fetchedEvents.length);
+      console.log('✅ Events fetched - count:', fetchedEvents.length);
       setEvents(fetchedEvents);
     } catch (error) {
       console.error("❌ Failed to fetch events:", error);
       toast.error("שגיאה בטעינת האירועים.");
     } finally {
       setIsLoadingEvents(false);
-      console.log('🏁 Fetch events completed');
     }
   }, [user]);
 
