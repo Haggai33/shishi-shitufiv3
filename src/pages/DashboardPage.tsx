@@ -180,23 +180,17 @@ const DashboardPage: React.FC = () => {
   };
 
   const fetchEvents = useCallback(async () => {
-    console.log('🔄 FETCH EVENTS CALLED - User ID:', user?.id);
-    
     if (!user) {
-      console.log('❌ NO USER - STOPPING FETCH');
       return;
     }
 
-    console.log('📞 ABOUT TO CALL FirebaseService.getEventsByOrganizer');
     setIsLoadingEvents(true);
     
     try {
-      console.log('📞 CALLING getEventsByOrganizer with ID:', user.id);
       const fetchedEvents = await FirebaseService.getEventsByOrganizer(user.id);
-      console.log('✅ EVENTS RECEIVED - count:', fetchedEvents.length);
       setEvents(fetchedEvents);
     } catch (error) {
-      console.error("❌ FETCH EVENTS ERROR:", error);
+      console.error("Error fetching events:", error);
       toast.error("שגיאה בטעינת האירועים.");
     } finally {
       setIsLoadingEvents(false);
