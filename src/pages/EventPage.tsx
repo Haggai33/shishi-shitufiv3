@@ -311,9 +311,64 @@ const UserMenuItemFormModal: React.FC<{ organizerId: string; eventId: string; us
         <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-xl max-w-lg w-full">
           <div className="flex items-center justify-between p-6 border-b"><h2 className="text-lg font-semibold text-neutral-900">הוסף פריט משלך</h2><button type="button" onClick={onClose} className="text-neutral-500 hover:text-neutral-700"><X size={24} /></button></div>
           <div className="p-6 space-y-4">
-              <div><label className="block text-sm font-medium text-neutral-700 mb-2">שם הפריט*</label><div className="relative"><ChefHat className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" /><input type=\"text\" placeholder="למשל: עוגת גבינה\" value={item.name} onChange={e => setItem({ ...item, name: e.target.value })} className=\"w-full p-2 pr-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent\" required /></div></div>
-              <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium text-neutral-700 mb-2">קטגוריה*</label><select value={item.category} onChange={e => setItem({ ...item, category: e.target.value as MenuCategory })} className="w-full p-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"><option value="starter">מנה ראשונה</option><option value="main">מנה עיקרית</option><option value="dessert">קינוח</option><option value="drink">משקה</option><option value="other">אחר</option></select></div><div><label className="block text-sm font-medium text-neutral-700 mb-2">כמות*</label><div className="relative"><Hash className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" /><input type=\"number\" placeholder="1\" value={item.quantity} onChange={e => setItem({ ...item, quantity: parseInt(e.target.value) || 1 })} className=\"w-full p-2 pr-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent\" required min=\"1" /></div></div></div>
-              <div><label className="block text-sm font-medium text-neutral-700 mb-2">הערות (אופציונלי)</label><div className="relative"><MessageSquare className="absolute right-3 top-3 h-4 w-4 text-neutral-400" /><textarea placeholder="לדוגמה: כשר, ללא בוטנים..." value={item.notes} onChange={e => setItem({ ...item, notes: e.target.value })} className="w-full p-2 pr-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent" rows={2} /></div></div>
+              <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">שם הפריט*</label>
+                  <div className="relative">
+                      <ChefHat className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" />
+                      <input 
+                          type="text" 
+                          placeholder="למשל: עוגת גבינה" 
+                          value={item.name} 
+                          onChange={e => setItem({ ...item, name: e.target.value })} 
+                          className="w-full p-2 pr-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent" 
+                          required 
+                      />
+                  </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                  <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-2">קטגוריה*</label>
+                      <select 
+                          value={item.category} 
+                          onChange={e => setItem({ ...item, category: e.target.value as MenuCategory })} 
+                          className="w-full p-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
+                      >
+                          <option value="starter">מנה ראשונה</option>
+                          <option value="main">מנה עיקרית</option>
+                          <option value="dessert">קינוח</option>
+                          <option value="drink">משקה</option>
+                          <option value="other">אחר</option>
+                      </select>
+                  </div>
+                  <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-2">כמות*</label>
+                      <div className="relative">
+                          <Hash className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" />
+                          <input 
+                              type="number" 
+                              placeholder="1" 
+                              value={item.quantity} 
+                              onChange={e => setItem({ ...item, quantity: parseInt(e.target.value) || 1 })} 
+                              className="w-full p-2 pr-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent" 
+                              required 
+                              min="1" 
+                          />
+                      </div>
+                  </div>
+              </div>
+              <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">הערות (אופציונלי)</label>
+                  <div className="relative">
+                      <MessageSquare className="absolute right-3 top-3 h-4 w-4 text-neutral-400" />
+                      <textarea 
+                          placeholder="לדוגמה: כשר, ללא בוטנים..." 
+                          value={item.notes} 
+                          onChange={e => setItem({ ...item, notes: e.target.value })} 
+                          className="w-full p-2 pr-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent" 
+                          rows={2} 
+                      />
+                  </div>
+              </div>
               <label className="flex items-center pt-2"><input type="checkbox" checked={assignToSelf} onChange={e => setAssignToSelf(e.target.checked)} className="h-4 w-4 rounded border-neutral-300 text-accent focus:ring-accent" /><span className="mr-2 text-sm text-neutral-700">שבץ אותי לפריט זה באופן אוטומטי</span></label>
           </div>
           <div className="bg-neutral-50 px-6 py-4 flex justify-end space-x-3 rtl:space-x-reverse rounded-b-xl">
