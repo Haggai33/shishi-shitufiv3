@@ -42,7 +42,7 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({
     if (user.isAnonymous && !isParticipant) {
       setShowNameInput(true);
     }
-  }, [user.uid]);
+  }, [user.uid, user.isAnonymous]);
 
   const handleSubmit = async () => {
     // ולידציה
@@ -61,11 +61,12 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({
       let finalUserName = participantName.trim();
       
       // אם המשתמש הזין שם, רשום אותו כמשתתף באירוע
-      if (showNameInput) {
+      if (showNameInput && finalUserName) {
         await FirebaseService.joinEvent(organizerId, eventId, user.uid, finalUserName);
       } else {
         // אם הוא כבר משתתף, קח את השם הקיים שלו
-        finalUserName = useStore.getState().currentEvent?.participants[user.uid]?.name || 'אורח';
+        const existingParticipant = useStore.getState().currentEvent?.participants[user.uid];
+        finalUserName = existingParticipant?.name || user.displayName || 'אורח';
       }
 
       if (isEdit && existingAssignment) {
@@ -99,49 +100,75 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-neutral-200">
+          <h2 className="text-lg font-semibold text-neutral-900">{isEdit ? 'עריכת שיבוץ' : 'שיבוץ פריט'}</h2>
+          <button onClick={onClose} disabled={isLoading} className="text-neutral-400 hover:text-neutral-600 transition-colors disabled:opacity-50">
+            <X size={24} />
+          </button>
+        </div>
+        
+        {/* Content */}
         <div className="p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-gray-800">{isEdit ? 'עריכת שיבוץ' : 'שיבוץ פריט'}</h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
-          </div>
-          
-          <div className="bg-orange-50 p-3 rounded-lg mb-6 text-center">
-            <p className="font-bold text-orange-800">{item.name}</p>
-            <p className="text-sm text-orange-700">כמות מוצעת: {item.quantity}</p>
+          <div className="bg-accent/10 p-4 rounded-lg mb-6 text-center">
+            <p className="font-bold text-accent">{item.name}</p>
+            <p className="text-sm text-accent/80">כמות מוצעת: {item.quantity}</p>
           </div>
 
           <div className="space-y-4">
             {showNameInput && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">שם מלא*</label>
+                <label className="block text-sm font-medium text-neutral-700 mb-2">שם מלא*</label>
                 <div className="relative">
-                    <UserIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input type="text" value={participantName} onChange={e => setParticipantName(e.target.value)} placeholder="השם שיוצג לכולם" className="w-full p-2 pl-3 pr-10 border border-gray-300 rounded-lg" />
+                  <UserIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" />
+                  <input 
+                    type="text" 
+                    value={participantName} 
+                    onChange={e => setParticipantName(e.target.value)} 
+                    placeholder="השם שיוצג לכולם" 
+                    className="w-full p-2 pr-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent" 
+                  />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">השם יישמר למכשיר זה עבור אירוע זה.</p>
+                <p className="text-xs text-neutral-500 mt-1">השם יישמר למכשיר זה עבור אירוע זה.</p>
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">כמות שאביא*</label>
+              <label className="block text-sm font-medium text-neutral-700 mb-2">כמות שאביא*</label>
               <div className="relative">
-                <Hash className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input type="number" value={quantity} onChange={e => setQuantity(parseInt(e.target.value, 10) || 1)} className="w-full p-2 pl-3 pr-10 border border-gray-300 rounded-lg" min="1" />
+                <Hash className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" />
+                <input 
+                  type="number" 
+                  value={quantity} 
+                  onChange={e => setQuantity(parseInt(e.target.value, 10) || 1)} 
+                  className="w-full p-2 pr-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent" 
+                  min="1" 
+                />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">הערות (אופציונלי)</label>
+              <label className="block text-sm font-medium text-neutral-700 mb-2">הערות (אופציונלי)</label>
               <div className="relative">
-                <MessageSquare className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
-                <textarea value={notes} onChange={e => setNotes(e.target.value)} className="w-full p-2 pl-3 pr-10 border border-gray-300 rounded-lg" rows={3} placeholder="לדוגמה: ללא גלוטן, טבעוני..." />
+                <MessageSquare className="absolute right-3 top-3 h-4 w-4 text-neutral-400" />
+                <textarea 
+                  value={notes} 
+                  onChange={e => setNotes(e.target.value)} 
+                  className="w-full p-2 pr-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent" 
+                  rows={3} 
+                  placeholder="לדוגמה: ללא גלוטן, טבעוני..." 
+                />
               </div>
             </div>
           </div>
         </div>
-        <div className="bg-gray-50 px-6 py-4 flex justify-end space-x-3 rtl:space-x-reverse rounded-b-xl">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300 font-medium">ביטול</button>
-          <button onClick={handleSubmit} disabled={isLoading} className="px-4 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:bg-orange-300 font-medium">
+        
+        {/* Actions */}
+        <div className="bg-neutral-100 px-6 py-4 flex justify-end space-x-3 rtl:space-x-reverse rounded-b-xl">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg bg-neutral-200 text-neutral-700 hover:bg-neutral-300 font-medium transition-colors">
+            ביטול
+          </button>
+          <button onClick={handleSubmit} disabled={isLoading} className="px-4 py-2 rounded-lg bg-accent text-white hover:bg-accent/90 disabled:bg-neutral-300 font-medium transition-colors">
             {isLoading ? 'מעדכן...' : isEdit ? 'שמור שינויים' : 'אשר שיבוץ'}
           </button>
         </div>

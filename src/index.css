@@ -5,9 +5,10 @@
 html, body, #root {
   height: 100%;
   overflow-x: hidden;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Added base font */
 }
 
-/* Glassmorphism Card Style */
+/* Glassmorphism Card Style for Category Selector */
 .category-card-2025 {
   background: white;
   border: 1px solid #e5e7eb;
@@ -20,7 +21,7 @@ html, body, #root {
   transform: translateY(-5px);
 }
 
-/* Aurora Glow Effect */
+/* Aurora Glow Effect for Category Selector */
 .aurora-glow {
   position: absolute;
   top: 0;
@@ -38,7 +39,7 @@ html, body, #root {
 }
 
 .glow-main {
-  background-image: radial-gradient(circle at 50% 0%, #ff8a00, transparent 70%);
+  background-image: radial-gradient(circle at 50% 0%, #009688, transparent 70%);
 }
 .glow-starter {
   background-image: radial-gradient(circle at 50% 0%, #3498db, transparent 70%);

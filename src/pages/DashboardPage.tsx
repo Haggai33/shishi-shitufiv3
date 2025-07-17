@@ -13,6 +13,7 @@ import { Plus, LogOut, Calendar, MapPin, Clock, Share2, Eye, Trash2, ChefHat, Ho
 const EventCard: React.FC<{ event: ShishiEvent, onDelete: (eventId: string, title: string) => void }> = ({ event, onDelete }) => {
   const navigate = useNavigate();
   const eventUrl = `${window.location.origin}/event/${event.organizerId}/${event.id}`;
+  const isPast = new Date(event.details.date) < new Date();
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(eventUrl);
@@ -22,30 +23,40 @@ const EventCard: React.FC<{ event: ShishiEvent, onDelete: (eventId: string, titl
   const menuItemsCount = event.menuItems ? Object.keys(event.menuItems).length : 0;
 
   return (
-    <div className="bg-white rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition-all duration-300 flex flex-col">
+    <div className={`bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-300 flex flex-col border-r-4 ${
+      isPast 
+        ? 'border-neutral-400 opacity-75' 
+        : event.details.isActive 
+          ? 'border-accent hover:scale-[1.02]' 
+          : 'border-neutral-300'
+    }`}>
       <div className="p-6 flex-grow">
         <div className="flex justify-between items-start mb-3">
-          <h3 className="text-lg font-bold text-gray-800">{event.details.title}</h3>
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${event.details.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-            {event.details.isActive ? 'פעיל' : 'לא פעיל'}
+          <h3 className="text-lg font-bold text-neutral-900">{event.details.title}</h3>
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+            isPast
+              ? 'bg-neutral-100 text-neutral-600'
+              : event.details.isActive ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
+          }`}>
+            {isPast ? 'הסתיים' : event.details.isActive ? 'פעיל' : 'לא פעיל'}
           </span>
         </div>
-        <div className="space-y-2 text-sm text-gray-600">
-          <p className="flex items-center"><Calendar size={14} className="ml-2" /> {new Date(event.details.date).toLocaleDateString('he-IL')}</p>
-          <p className="flex items-center"><Clock size={14} className="ml-2" /> {event.details.time}</p>
-          <p className="flex items-center"><MapPin size={14} className="ml-2" /> {event.details.location}</p>
-          <p className="flex items-center"><ChefHat size={14} className="ml-2" /> {menuItemsCount} פריטים בתפריט</p>
+        <div className="space-y-2 text-sm text-neutral-600">
+          <p className="flex items-center"><Calendar size={14} className="ml-2 text-accent" /> {new Date(event.details.date).toLocaleDateString('he-IL')}</p>
+          <p className="flex items-center"><Clock size={14} className="ml-2 text-accent" /> {event.details.time}</p>
+          <p className="flex items-center"><MapPin size={14} className="ml-2 text-accent" /> {event.details.location}</p>
+          <p className="flex items-center"><ChefHat size={14} className="ml-2 text-accent" /> {menuItemsCount} פריטים בתפריט</p>
         </div>
       </div>
-      <div className="bg-gray-50 p-4 border-t flex justify-between items-center rounded-b-xl">
-        <button onClick={copyToClipboard} className="flex items-center text-sm text-blue-600 hover:text-blue-800 font-semibold">
+      <div className="bg-neutral-50 p-4 border-t flex justify-between items-center rounded-b-xl">
+        <button onClick={copyToClipboard} className="flex items-center text-sm text-info hover:text-info/80 font-semibold">
           <Share2 size={16} className="ml-1" /> שתף
         </button>
-        <div className="flex items-center space-x-2">
-          <button onClick={() => navigate(`/event/${event.organizerId}/${event.id}`)} className="p-2 text-gray-500 hover:bg-gray-200 rounded-full" title="צפה באירוע">
+        <div className="flex items-center space-x-2 rtl:space-x-reverse">
+          <button onClick={() => navigate(`/event/${event.organizerId}/${event.id}`)} className="p-2 text-neutral-500 hover:bg-neutral-200 rounded-full" title="צפה באירוע">
             <Eye size={18} />
           </button>
-          <button onClick={() => onDelete(event.id, event.details.title)} className="p-2 text-gray-500 hover:bg-red-100 hover:text-red-600 rounded-full" title="מחק אירוע">
+          <button onClick={() => onDelete(event.id, event.details.title)} className="p-2 text-neutral-500 hover:bg-error/10 hover:text-error rounded-full" title="מחק אירוע">
             <Trash2 size={18} />
           </button>
         </div>
