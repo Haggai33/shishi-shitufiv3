@@ -157,7 +157,7 @@ const AssignmentModal: React.FC<{ item: MenuItemType; organizerId: string; event
     const [showNameInput, setShowNameInput] = useState(false);
     
     useEffect(() => {
-        const isParticipant = !!useStore.getState().currentEvent?.participants[user.uid];
+        const isParticipant = !!useStore.getState().currentEvent?.participants?.[user.uid];
         if (user.isAnonymous && !isParticipant) {
             setShowNameInput(true);
         }
