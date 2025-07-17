@@ -73,21 +73,35 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.group('📝 UserMenuItemForm.handleSubmit');
+    console.log('👤 Current user:', authUser);
+    console.log('📋 Form data:', formData);
+    console.log('🏷️ Participant name:', participantName);
+    console.log('📝 Show name input:', showNameInput);
+    
     if (!authUser) {
+      console.error('❌ No authenticated user');
       toast.error('יש להתחבר כדי להוסיף פריט');
+      console.groupEnd();
       return;
     }
 
+    console.log('🔍 Validating form...');
     if (!validateForm()) {
+      console.error('❌ Form validation failed');
       toast.error('יש לתקן את השגיאות בטופס');
+      console.groupEnd();
       return;
     }
 
     if (showNameInput && !participantName.trim()) {
+      console.error('❌ Name required but not provided');
       toast.error('יש להזין שם כדי להוסיף פריט');
+      console.groupEnd();
       return;
     }
 
+    console.log('✅ All validations passed, starting submission...');
     setIsSubmitting(true);
 
     try {
@@ -95,13 +109,17 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
       
       // אם המשתמש הזין שם, רשום אותו כמשתתף באירוע
       if (showNameInput && finalUserName) {
+        console.log('👥 Joining event with name:', finalUserName);
         await FirebaseService.joinEvent(event.organizerId, event.id, authUser.uid, finalUserName);
+        console.log('✅ Successfully joined event');
       } else {
         // אם הוא כבר משתתף, קח את השם הקיים שלו
         const existingParticipant = event.participants?.[authUser.uid];
         finalUserName = existingParticipant?.name || authUser.displayName || 'אורח';
+        console.log('👤 Using existing name:', finalUserName);
       }
 
+      console.log('🍽️ Preparing menu item data...');
       const newItemData: Omit<MenuItem, 'id'> = {
         eventId: event.id,
         name: formData.name.trim(),
@@ -113,8 +131,10 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
         creatorId: authUser.uid,
         creatorName: finalUserName
       };
+      console.log('📋 New item data:', newItemData);
 
       if (formData.assignToSelf) {
+        console.log('🎯 Adding item with self-assignment...');
         // הוספת פריט עם שיבוץ אוטומטי
         const itemId = await FirebaseService.addMenuItemAndAssign(
           event.organizerId,
@@ -125,25 +145,36 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
         );
         
         if (itemId) {
+          console.log('✅ Item added and assigned successfully, ID:', itemId);
           // הוספה לסטור המקומי
           addMenuItem({ ...newItemData, id: itemId });
           toast.success('הפריט נוסף ושובץ בהצלחה!');
         }
       } else {
+        console.log('📝 Adding item without assignment...');
         // הוספת פריט בלבד
         const itemId = await FirebaseService.addMenuItem(event.organizerId, event.id, newItemData);
         
         if (itemId) {
+          console.log('✅ Item added successfully, ID:', itemId);
           // הוספה לסטור המקומי
           addMenuItem({ ...newItemData, id: itemId });
           toast.success('הפריט נוסף בהצלחה!');
         }
       }
 
+      console.log('🎉 Form submission completed successfully');
+      console.groupEnd();
       onClose();
     } catch (error: any) {
-      console.error('Error adding menu item:', error);
+      console.error('❌ Error in form submission:', error);
+      console.error('📊 Error details:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack
+      });
       toast.error(error.message || 'שגיאה בהוספת הפריט. אנא נסה שוב.');
+      console.groupEnd();
     } finally {
       setIsSubmitting(false);
     }

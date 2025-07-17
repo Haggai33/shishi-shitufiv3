@@ -178,8 +178,12 @@ export class FirebaseService {
     eventId: string, 
     itemData: Omit<MenuItem, 'id'>
   ): Promise<string> {
-    console.log('Adding menu item:', { organizerId, eventId, itemData });
+    console.group('🍽️ FirebaseService.addMenuItem');
+    console.log('📥 Input parameters:', { organizerId, eventId, itemData });
+    console.log('🔗 Event path:', this.eventPath(organizerId, eventId));
     
+    try {
+      console.log('🔧 Ensuring event structure...');
     await this.ensureEventStructure(organizerId, eventId);
     
     const newItemRef = push(ref(database, `${this.eventPath(organizerId, eventId)}/menuItems`));
@@ -231,9 +235,12 @@ export class FirebaseService {
       // יצירת שיבוץ נפרד
       const newAssignmentRef = push(ref(database, `${this.eventPath(organizerId, eventId)}/assignments`));
       const assignmentData: Omit<Assignment, 'id'> = {
+      console.log('✅ Event structure ensured');
         menuItemId: newItemId,
+      console.log('📝 Creating new item reference...');
         userId: assignToUserId,
         userName: assignToUserName,
+      console.log('🆔 Generated item ID:', newItemId);
         quantity: itemData.quantity,
         notes: '',
         status: 'confirmed',
@@ -312,11 +319,18 @@ export class FirebaseService {
   /**
    * מסיר משתתף מהאירוע
    */
-  static async leaveEvent(organizerId: string, eventId: string, userId: string): Promise<void> {
+      console.log('📋 Final item data to save:', finalItemData);
+      console.log('💾 Saving to Firebase...');
     const participantRef = ref(database, `${this.eventPath(organizerId, eventId)}/participants/${userId}`);
     await remove(participantRef);
-  }
+      console.log('✅ Menu item saved successfully!');
+      console.groupEnd();
 
+    } catch (error) {
+      console.error('❌ Error in addMenuItem:', error);
+      console.groupEnd();
+      throw error;
+    }
   // ===============================
   // ניהול שיבוצים (Assignments)
   // ===============================
@@ -391,12 +405,19 @@ export class FirebaseService {
     
     await update(ref(database), updates);
   }
-
+    console.group('🍽️➕👤 FirebaseService.addMenuItemAndAssign');
+    console.log('📥 Input parameters:', { organizerId, eventId, itemData, assignToUserId, assignToUserName });
+    console.log('🔗 Event path:', this.eventPath(organizerId, eventId));
   // ===============================
+    try {
+      console.log('🔧 Ensuring event structure...');
   // פונקציות תחזוקה ואבחון
+      console.log('✅ Event structure ensured');
   // ===============================
+      console.log('📝 Creating new item reference...');
 
   /**
+      console.log('🆔 Generated item ID:', newItemId);
    * מוודא עקביות נתונים באירוע
    */
   static async validateEventData(organizerId: string, eventId: string): Promise<{
@@ -408,11 +429,13 @@ export class FirebaseService {
     try {
       const eventSnapshot = await get(ref(database, this.eventPath(organizerId, eventId)));
       
+        console.log('👤 Adding assignment data to item...');
       if (!eventSnapshot.exists()) {
         return { isValid: false, issues: ['האירוע לא קיים'] };
       }
       
       const eventData = eventSnapshot.val();
+        console.log('📋 Creating separate assignment...');
       
       // בדיקת מבנה בסיסי
       if (!eventData.details) issues.push('חסרים פרטי האירוע');
@@ -424,6 +447,7 @@ export class FirebaseService {
         const menuItems = eventData.menuItems;
         const assignments = eventData.assignments;
         
+        console.log('📋 Assignment data:', assignmentData);
         Object.entries(assignments).forEach(([assignmentId, assignment]: [string, any]) => {
           const menuItem = menuItems[assignment.menuItemId];
           if (!menuItem) {
@@ -435,9 +459,16 @@ export class FirebaseService {
       }
       
       return { isValid: issues.length === 0, issues };
-      
+      console.log('💾 Updates to apply:', updates);
+      console.log('🚀 Applying updates to Firebase...');
     } catch (error) {
-      return { isValid: false, issues: [`שגיאה בבדיקת הנתונים: ${error}`] };
+      console.log('✅ Menu item and assignment saved successfully!');
+      console.groupEnd();
+    }
+    } catch (error) {
+      console.error('❌ Error in addMenuItemAndAssign:', error);
+      console.groupEnd();
+      throw error;
     }
   }
 }
