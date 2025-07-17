@@ -1,6 +1,6 @@
 // src/services/firebaseService.ts
 
-import { ref, push, set, get, onValue, off, remove, update, query, where, orderByChild } from 'firebase/database';
+import { ref, push, set, get, onValue, off, remove, update, query, equalTo, orderByChild } from 'firebase/database';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { database, auth } from '../lib/firebase';
 import { ShishiEvent, MenuItem, Assignment, User, EventDetails } from '../types';
@@ -146,7 +146,7 @@ export class FirebaseService {
     
     try {
       const eventsRef = ref(database, 'events');
-      const eventsQuery = query(eventsRef, orderByChild('organizerId'), where('organizerId', '==', organizerId));
+      const eventsQuery = query(eventsRef, orderByChild('organizerId'), equalTo(organizerId));
       console.log('🔍 Query path:', 'events');
       console.log('🔍 Query filter:', `organizerId == ${organizerId}`);
       
