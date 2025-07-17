@@ -249,7 +249,7 @@ const AssignmentModal: React.FC<{ item: MenuItemType; organizerId: string; event
 // --- Component: UserMenuItemFormModal ---
 // Updated based on the new design guide
 // Import the actual UserMenuItemForm component
-import { UserMenuItemForm } from '../../components/Events/UserMenuItemForm';
+import { UserMenuItemForm } from '../components/Events/UserMenuItemForm';
 
 // --- Component: LoadingSpinner ---
 const LoadingSpinner: React.FC = () => (
