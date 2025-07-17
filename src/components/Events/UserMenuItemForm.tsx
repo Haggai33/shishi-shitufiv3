@@ -412,6 +412,7 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
             </button>
           </div>
         </div>
+        </form>
       </div>
     </div>
   );
