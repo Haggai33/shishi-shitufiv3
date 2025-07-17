@@ -164,12 +164,11 @@ const DashboardPage: React.FC = () => {
   };
 
   const fetchEvents = useCallback(async () => {
-    console.group('🔄 DashboardPage.fetchEvents');
+    console.log('🔄 STARTING fetchEvents');
     console.log('👤 Current user:', user);
     
     if (!user) {
       console.log('❌ No user found, skipping fetch');
-      console.groupEnd();
       return;
     }
 
@@ -184,17 +183,10 @@ const DashboardPage: React.FC = () => {
       setEvents(fetchedEvents);
     } catch (error) {
       console.error("❌ Failed to fetch events:", error);
-      console.error("📊 Error details:", {
-        message: error?.message,
-        code: error?.code,
-        stack: error?.stack,
-        userId: user?.id
-      });
       toast.error("שגיאה בטעינת האירועים.");
     } finally {
       setIsLoadingEvents(false);
       console.log('🏁 Fetch events completed');
-      console.groupEnd();
     }
   }, [user]);
 

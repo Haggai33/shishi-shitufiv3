@@ -141,16 +141,21 @@ export class FirebaseService {
    * מחזיר את כל האירועים של מארגן ספציפי
    */
   static async getEventsByOrganizer(organizerId: string): Promise<ShishiEvent[]> {
+    console.log('📋 STARTING getEventsByOrganizer');
+    console.log('📥 organizerId:', organizerId);
+    
     console.group('📋 FirebaseService.getEventsByOrganizer');
     console.log('📥 Input parameters:', { organizerId });
     
     try {
       const eventsRef = ref(database, 'events');
       console.log('🔍 Creating query for events collection');
+      console.log('🔍 Creating query for events collection');
       console.log('🔍 Query path: events');
       console.log('🔍 Filter: organizerId ==', organizerId);
       
       const eventsQuery = query(eventsRef, orderByChild('organizerId'), equalTo(organizerId));
+      console.log('📡 Executing Firebase query...');
       console.log('🔍 Query path:', 'events');
       console.log('🔍 Query filter:', `organizerId == ${organizerId}`);
       
@@ -158,9 +163,12 @@ export class FirebaseService {
       const snapshot = await get(eventsQuery);
       console.log('📡 Firebase response received');
       console.log('📊 Snapshot exists:', snapshot.exists());
+      console.log('📡 Firebase response received');
+      console.log('📊 Snapshot exists:', snapshot.exists());
       
       if (snapshot.exists()) {
         const eventsData = snapshot.val();
+        console.log('📋 Raw events data:', eventsData);
         console.log('📋 Raw events data:', eventsData);
         console.log('📊 Raw data keys:', Object.keys(eventsData));
         
@@ -169,6 +177,8 @@ export class FirebaseService {
           ...(event as Omit<ShishiEvent, 'id'>)
         }));
         
+        console.log('✅ Processed events:', events);
+        console.log('📊 Events count:', events.length);
         console.log('✅ Processed events:', events);
         console.log('📊 Events count:', events.length);
         
@@ -187,9 +197,11 @@ export class FirebaseService {
       }
       
       console.log('📭 No events found for organizer');
+      console.log('📭 No events found for organizer');
       console.groupEnd();
       return [];
     } catch (error) {
+      console.error('❌ Error in getEventsByOrganizer:', error);
       console.error('❌ Error in getEventsByOrganizer:', error);
       console.error('📊 Error details:', {
         message: error?.message,
