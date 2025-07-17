@@ -144,16 +144,24 @@ export class FirebaseService {
     console.group('📋 FirebaseService.getEventsByOrganizer');
     console.log('📥 Input parameters:', { organizerId });
     
+    console.group('📋 FirebaseService.getEventsByOrganizer');
+    console.log('📥 Input parameters:', { organizerId });
+    
     try {
       const eventsRef = ref(database, 'events');
       const eventsQuery = query(eventsRef, orderByChild('organizerId'), equalTo(organizerId));
       console.log('🔍 Query path:', 'events');
       console.log('🔍 Query filter:', `organizerId == ${organizerId}`);
+      console.log('🔍 Query path:', 'events');
+      console.log('🔍 Query filter:', `organizerId == ${organizerId}`);
       
       const snapshot = await get(eventsQuery);
+      console.log('📡 Firebase response received');
+      console.log('📊 Snapshot exists:', snapshot.exists());
       
       if (snapshot.exists()) {
         const eventsData = snapshot.val();
+        console.log('📋 Raw events data:', eventsData);
         console.log('📋 Raw events data:', eventsData);
         
         const events = Object.entries(eventsData).map(([id, event]) => ({
@@ -162,15 +170,26 @@ export class FirebaseService {
         }));
         
         console.log('✅ Processed events:', events);
+        console.log('📊 Events count:', events.length);
+        console.groupEnd();
+        console.log('✅ Processed events:', events);
         console.groupEnd();
         return events;
       }
       
       console.log('📭 No events found for organizer');
       console.groupEnd();
+      console.log('📭 No events found for organizer');
+      console.groupEnd();
       return [];
     } catch (error) {
       console.error('❌ Error in getEventsByOrganizer:', error);
+      console.error('📊 Error details:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack
+      });
+      console.groupEnd();
       console.groupEnd();
       throw error;
     }
