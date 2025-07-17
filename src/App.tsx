@@ -16,6 +16,9 @@ function App() {
   const { isLoading: isAuthLoading } = useAuth();
   const { user } = useStore();
 
+  console.log('🎯 App.tsx - Current user:', user);
+  console.log('🎯 App.tsx - Auth loading:', isAuthLoading);
+
   if (isAuthLoading) {
     return <LoadingSpinner />;
   }

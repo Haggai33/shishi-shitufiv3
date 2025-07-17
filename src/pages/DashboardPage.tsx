@@ -6,7 +6,7 @@ import { useStore } from '../store/useStore';
 import { FirebaseService } from '../services/firebaseService';
 import { ShishiEvent, EventDetails } from '../types';
 import { toast } from 'react-hot-toast';
-import { Plus, LogOut, Calendar, MapPin, Clock, Share2, Eye, Trash2, ChefHat, Home } from 'lucide-react';
+import { Plus, LogOut, Calendar, MapPin, Clock, Share2, Eye, Trash2, ChefHat, Home, Settings, Users } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 
@@ -54,7 +54,7 @@ const EventCard: React.FC<{ event: ShishiEvent, onDelete: (eventId: string, titl
           <Share2 size={16} className="ml-1" /> שתף
         </button>
         <div className="flex items-center space-x-2 rtl:space-x-reverse">
-          <button onClick={() => navigate(`/event/${event.id}`)} className="p-2 text-neutral-500 hover:bg-neutral-200 rounded-full" title="צפה באירוע">
+          <button onClick={() => navigate(`/event/${event.id}`)} className="p-2 text-neutral-500 hover:bg-neutral-200 rounded-full" title="צפה באירוع">
             <Eye size={18} />
           </button>
           <button onClick={() => onDelete(event.id, event.details.title)} className="p-2 text-neutral-500 hover:bg-error/10 hover:text-error rounded-full" title="מחק אירוע">
@@ -147,10 +147,12 @@ const EventFormModal: React.FC<{ onClose: () => void, onEventCreated: () => void
 // --- רכיב הדאשבורד הראשי ---
 const DashboardPage: React.FC = () => {
   const { user } = useStore();
-
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [events, setEvents] = useState<ShishiEvent[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  console.log('🎯 DashboardPage render - User:', user);
 
   const logout = async () => {
     console.log('🚪 Logging out user');
@@ -216,8 +218,6 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  console.log('🎨 DashboardPage render - User:', user, 'Events:', events.length, 'Loading:', isLoadingEvents);
-
   if (!user) {
     console.log('⏳ No user, showing loading spinner');
     return (
@@ -229,45 +229,107 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Header with Admin Panel Toggle */}
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
           <div className="flex items-center">
             <ChefHat className="h-8 w-8 text-orange-500" />
             <h1 className="ml-3 text-2xl font-bold text-gray-900">הדאשבורד של {user?.name}</h1>
           </div>
-          <button onClick={logout} className="text-sm font-medium text-gray-600 hover:text-red-500 flex items-center">
-            <LogOut size={16} className="ml-1" />
-            התנתק
-          </button>
+          
+          <div className="flex items-center space-x-4 rtl:space-x-reverse">
+            {/* Admin Panel Toggle */}
+            <button
+              onClick={() => setShowAdminPanel(!showAdminPanel)}
+              className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                showAdminPanel 
+                  ? 'bg-blue-100 text-blue-700' 
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <Settings className="h-4 w-4 ml-1" />
+              {showAdminPanel ? 'חזור לאירועים' : 'פאנל ניהול'}
+            </button>
+            
+            <button onClick={logout} className="text-sm font-medium text-gray-600 hover:text-red-500 flex items-center">
+              <LogOut size={16} className="ml-1" />
+              התנתק
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center mb-6 px-4 sm:px-0">
-            <h2 className="text-xl font-semibold text-gray-700">האירועים שלי ({events.length})</h2>
-            <button onClick={() => setShowCreateModal(true)} className="flex items-center bg-orange-500 text-white px-4 py-2 rounded-lg shadow hover:bg-orange-600 transition-colors">
-                <Plus size={20} className="ml-2" />
-                צור אירוע חדש
-            </button>
-        </div>
-
-        {isLoadingEvents ? (
-             <div className="flex items-center justify-center h-64">
-               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
-               <p className="ml-4 text-gray-600">טוען אירועים...</p>
-             </div>
-        ) : events.length > 0 ? (
+        {showAdminPanel ? (
+          // Admin Panel Content
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-xl font-bold mb-6">פאנל ניהול</h2>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {events.map(event => (
-                    <EventCard key={event.id} event={event} onDelete={handleDeleteEvent} />
-                ))}
+              {events.map(event => (
+                <div key={event.id} className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="font-bold text-lg mb-2">{event.details.title}</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    {new Date(event.details.date).toLocaleDateString('he-IL')} • {event.details.time}
+                  </p>
+                  
+                  <div className="space-y-2">
+                    <button 
+                      onClick={() => {
+                        // כאן נוסיף את פונקציית הייבוא
+                        toast.info('פונקציית ייבוא תתווסף בקרוב');
+                      }}
+                      className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center"
+                    >
+                      <Plus className="h-4 w-4 ml-1" />
+                      ייבא פריטים
+                    </button>
+                    
+                    <button 
+                      onClick={() => {
+                        // כאן נוסיף את ניהול המשתתפים
+                        toast.info('ניהול משתתפים יתווסף בקרוב');
+                      }}
+                      className="w-full bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center"
+                    >
+                      <Users className="h-4 w-4 ml-1" />
+                      נהל משתתפים
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
+          </div>
         ) : (
-            <div className="text-center py-16 bg-white rounded-lg border-2 border-dashed">
-                <Home size={48} className="mx-auto text-gray-400" />
-                <h3 className="mt-2 text-lg font-medium text-gray-900">עדיין לא יצרת אירועים</h3>
-                <p className="mt-1 text-sm text-gray-500">לחץ על "צור אירוע חדש" כדי להתחיל.</p>
+          // Regular Events View
+          <>
+            <div className="flex justify-between items-center mb-6 px-4 sm:px-0">
+                <h2 className="text-xl font-semibold text-gray-700">האירועים שלי ({events.length})</h2>
+                <button onClick={() => setShowCreateModal(true)} className="flex items-center bg-orange-500 text-white px-4 py-2 rounded-lg shadow hover:bg-orange-600 transition-colors">
+                    <Plus size={20} className="ml-2" />
+                    צור אירוע חדש
+                </button>
             </div>
+
+            {isLoadingEvents ? (
+                 <div className="flex items-center justify-center h-64">
+                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+                   <p className="ml-4 text-gray-600">טוען אירועים...</p>
+                 </div>
+            ) : events.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {events.map(event => (
+                        <EventCard key={event.id} event={event} onDelete={handleDeleteEvent} />
+                    ))}
+                </div>
+            ) : (
+                <div className="text-center py-16 bg-white rounded-lg border-2 border-dashed">
+                    <Home size={48} className="mx-auto text-gray-400" />
+                    <h3 className="mt-2 text-lg font-medium text-gray-900">עדיין לא יצרת אירועים</h3>
+                    <p className="mt-1 text-sm text-gray-500">לחץ על "צור אירוע חדש" כדי להתחיל.</p>
+                </div>
+            )}
+          </>
         )}
       </main>
 
