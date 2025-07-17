@@ -42,16 +42,25 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
   ];
 
   useEffect(() => {
+    console.group('🔍 UserMenuItemForm.useEffect');
+    console.log('👤 Current authUser:', authUser);
+    console.log('📅 Current event:', event);
+    console.log('👥 Event participants:', event.participants);
+    
     if (authUser?.isAnonymous) {
       const participants = event.participants || {};
       const isParticipant = !!participants[authUser.uid];
+      console.log('🔍 Is anonymous user already participant?', isParticipant);
       if (!isParticipant) {
+        console.log('📝 Showing name input for anonymous user');
         setShowNameInput(true);
       }
     }
+    console.groupEnd();
   }, [authUser, event.participants]);
 
   const validateForm = (): boolean => {
+    console.group('✅ UserMenuItemForm.validateForm');
     const newErrors: FormErrors = {};
 
     if (!formData.name.trim()) {
@@ -66,8 +75,14 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
       newErrors.quantity = 'הכמות לא יכולה להיות יותר מ-100';
     }
 
+    console.log('📋 Form data:', formData);
+    console.log('❌ Validation errors:', newErrors);
+    
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const isValid = Object.keys(newErrors).length === 0;
+    console.log('✅ Form is valid:', isValid);
+    console.groupEnd();
+    return isValid;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -78,6 +93,11 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
     console.log('📋 Form data:', formData);
     console.log('🏷️ Participant name:', participantName);
     console.log('📝 Show name input:', showNameInput);
+    console.log('📅 Event details:', {
+      id: event.id,
+      organizerId: event.organizerId,
+      title: event.details?.title
+    });
     
     if (!authUser) {
       console.error('❌ No authenticated user');
@@ -110,6 +130,8 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
       // אם המשתמש הזין שם, רשום אותו כמשתתף באירוע
       if (showNameInput && finalUserName) {
         console.log('👥 Joining event with name:', finalUserName);
+        console.log('🔗 Event path for joining:', `organizerEvents/${event.organizerId}/events/${event.id}/participants/${authUser.uid}`);
+        
         await FirebaseService.joinEvent(event.organizerId, event.id, authUser.uid, finalUserName);
         console.log('✅ Successfully joined event');
       } else {
@@ -132,6 +154,7 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
         creatorName: finalUserName
       };
       console.log('📋 New item data:', newItemData);
+      console.log('🔗 Firebase path for item:', `organizerEvents/${event.organizerId}/events/${event.id}/menuItems`);
 
       if (formData.assignToSelf) {
         console.log('🎯 Adding item with self-assignment...');
@@ -149,6 +172,9 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
           // הוספה לסטור המקומי
           addMenuItem({ ...newItemData, id: itemId });
           toast.success('הפריט נוסף ושובץ בהצלחה!');
+        } else {
+          console.error('❌ Failed to get item ID');
+          throw new Error('לא התקבל מזהה פריט');
         }
       } else {
         console.log('📝 Adding item without assignment...');
@@ -160,6 +186,9 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
           // הוספה לסטור המקומי
           addMenuItem({ ...newItemData, id: itemId });
           toast.success('הפריט נוסף בהצלחה!');
+        } else {
+          console.error('❌ Failed to get item ID');
+          throw new Error('לא התקבל מזהה פריט');
         }
       }
 
@@ -173,7 +202,16 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
         code: error.code,
         stack: error.stack
       });
-      toast.error(error.message || 'שגיאה בהוספת הפריט. אנא נסה שוב.');
+      
+      // הצגת שגיאה מפורטת יותר
+      let errorMessage = 'שגיאה בהוספת הפריט';
+      if (error.code === 'PERMISSION_DENIED') {
+        errorMessage = 'אין הרשאה להוסיף פריט. בדוק את הגדרות Firebase';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
       console.groupEnd();
     } finally {
       setIsSubmitting(false);
@@ -181,6 +219,7 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
   };
 
   const handleInputChange = (field: keyof typeof formData, value: any) => {
+    console.log(`📝 Input changed: ${field} = ${value}`);
     setFormData(prev => ({ ...prev, [field]: value }));
     
     // Clear error when user starts typing
@@ -188,6 +227,14 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
       setErrors(prev => ({ ...prev, [field]: undefined }));
     }
   };
+
+  console.log('🎨 Rendering UserMenuItemForm with:', {
+    authUser: authUser?.uid,
+    eventId: event.id,
+    organizerId: event.organizerId,
+    showNameInput,
+    isSubmitting
+  });
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -364,7 +411,7 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
               ביטול
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

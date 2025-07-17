@@ -248,100 +248,8 @@ const AssignmentModal: React.FC<{ item: MenuItemType; organizerId: string; event
 
 // --- Component: UserMenuItemFormModal ---
 // Updated based on the new design guide
-const UserMenuItemFormModal: React.FC<{ organizerId: string; eventId: string; user: FirebaseUser; onClose: () => void; }> = 
-({ organizerId, eventId, user, onClose }) => {
-    // Re-implementing logic from original UserMenuItemForm.tsx component
-    const [item, setItem] = useState({ name: '', category: 'main' as MenuCategory, quantity: 1, notes: '' });
-    const [assignToSelf, setAssignToSelf] = useState(true);
-    const [isLoading, setIsLoading] = useState(false);
-    
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!item.name.trim() || item.quantity <= 0) { toast.error("יש למלא שם וכמות תקינה."); return; }
-        setIsLoading(true);
-        try {
-            const finalUserName = useStore.getState().currentEvent?.participants[user.uid]?.name || user.displayName || 'אורח';
-            const newItemData: Omit<MenuItemType, 'id' | 'eventId'> = { ...item, creatorId: user.uid, creatorName: finalUserName, createdAt: Date.now(), isRequired: false };
-            await FirebaseService.addMenuItemAndAssign(organizerId, eventId, newItemData, assignToSelf ? user.uid : null, finalUserName);
-            toast.success("הפריט נוסף בהצלחה!");
-            onClose();
-        } catch (error) { toast.error("שגיאה בהוספת הפריט."); } 
-        finally { setIsLoading(false); }
-    };
-    
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-xl max-w-lg w-full">
-          <div className="flex items-center justify-between p-6 border-b"><h2 className="text-lg font-semibold text-neutral-900">הוסף פריט משלך</h2><button type="button" onClick={onClose} className="text-neutral-500 hover:text-neutral-700"><X size={24} /></button></div>
-          <div className="p-6 space-y-4">
-              <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">שם הפריט*</label>
-                  <div className="relative">
-                      <ChefHat className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" />
-                      <input 
-                          type="text" 
-                          placeholder="למשל: עוגת גבינה" 
-                          value={item.name} 
-                          onChange={e => setItem({ ...item, name: e.target.value })} 
-                          className="w-full p-2 pr-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent" 
-                          required 
-                      />
-                  </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                  <div>
-                      <label className="block text-sm font-medium text-neutral-700 mb-2">קטגוריה*</label>
-                      <select 
-                          value={item.category} 
-                          onChange={e => setItem({ ...item, category: e.target.value as MenuCategory })} 
-                          className="w-full p-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
-                      >
-                          <option value="starter">מנה ראשונה</option>
-                          <option value="main">מנה עיקרית</option>
-                          <option value="dessert">קינוח</option>
-                          <option value="drink">משקה</option>
-                          <option value="other">אחר</option>
-                      </select>
-                  </div>
-                  <div>
-                      <label className="block text-sm font-medium text-neutral-700 mb-2">כמות*</label>
-                      <div className="relative">
-                          <Hash className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" />
-                          <input 
-                              type="number" 
-                              placeholder="1" 
-                              value={item.quantity} 
-                              onChange={e => setItem({ ...item, quantity: parseInt(e.target.value) || 1 })} 
-                              className="w-full p-2 pr-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent" 
-                              required 
-                              min="1" 
-                          />
-                      </div>
-                  </div>
-              </div>
-              <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">הערות (אופציונלי)</label>
-                  <div className="relative">
-                      <MessageSquare className="absolute right-3 top-3 h-4 w-4 text-neutral-400" />
-                      <textarea 
-                          placeholder="לדוגמה: כשר, ללא בוטנים..." 
-                          value={item.notes} 
-                          onChange={e => setItem({ ...item, notes: e.target.value })} 
-                          className="w-full p-2 pr-10 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent" 
-                          rows={2} 
-                      />
-                  </div>
-              </div>
-              <label className="flex items-center pt-2"><input type="checkbox" checked={assignToSelf} onChange={e => setAssignToSelf(e.target.checked)} className="h-4 w-4 rounded border-neutral-300 text-accent focus:ring-accent" /><span className="mr-2 text-sm text-neutral-700">שבץ אותי לפריט זה באופן אוטומטי</span></label>
-          </div>
-          <div className="bg-neutral-50 px-6 py-4 flex justify-end space-x-3 rtl:space-x-reverse rounded-b-xl">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg bg-neutral-200 text-neutral-800 hover:bg-neutral-300 font-medium">ביטול</button>
-            <button type="submit" disabled={isLoading} className="px-4 py-2 rounded-lg bg-success text-white hover:bg-success/90 disabled:bg-neutral-300 font-medium">{isLoading ? 'מוסיף...' : 'הוסף ושלח'}</button>
-          </div>
-        </form>
-      </div>
-    );
-};
+// Import the actual UserMenuItemForm component
+import { UserMenuItemForm } from '../../components/Events/UserMenuItemForm';
 
 // --- Component: LoadingSpinner ---
 const LoadingSpinner: React.FC = () => (
@@ -500,7 +408,12 @@ const EventPage: React.FC = () => {
             {showNameModal && (<NameModal isLoading={isJoining} onSave={handleJoinEvent} />)}
             {localUser && modalState?.type === 'assign' && modalState.item && (<AssignmentModal item={modalState.item} organizerId={organizerId!} eventId={eventId!} user={localUser} onClose={() => setModalState(null)} />)}
             {localUser && modalState?.type === 'edit' && modalState.item && modalState.assignment && (<AssignmentModal item={modalState.item} organizerId={organizerId!} eventId={eventId!} user={localUser} onClose={() => setModalState(null)} isEdit={true} existingAssignment={modalState.assignment} />)}
-            {localUser && modalState?.type === 'add-user-item' && (<UserMenuItemFormModal organizerId={organizerId!} eventId={eventId!} user={localUser} onClose={() => setModalState(null)} />)}
+            {modalState?.type === 'add-user-item' && currentEvent && (
+                <UserMenuItemForm 
+                    event={currentEvent} 
+                    onClose={() => setModalState(null)} 
+                />
+            )}
         </div>
     );
 };
