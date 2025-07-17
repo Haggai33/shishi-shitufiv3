@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
 import { useStore } from '../store/useStore';
 import { FirebaseService } from '../services/firebaseService';
 import { ShishiEvent, EventDetails } from '../types';
 import { toast } from 'react-hot-toast';
-import { Plus, LogOut, Calendar, MapPin, Clock, Share2, Eye, Trash2, ChefHat, Home } from 'lucide-react';
+import { Plus, LogOut, Calendar, MapPin, Clock, Share2, Eye, Trash2, ChefHat, Home, User } from 'lucide-react';
+import { signOut } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 
 // --- רכיב כרטיס אירוע (ללא שינוי) ---
 const EventCard: React.FC<{ event: ShishiEvent, onDelete: (eventId: string, title: string) => void }> = ({ event, onDelete }) => {
@@ -137,20 +138,28 @@ const EventFormModal: React.FC<{ onClose: () => void, onEventCreated: () => void
 
 // --- רכיב הדאשבורד הראשי (לאחר שכתוב) ---
 const DashboardPage: React.FC = () => {
-  const { logout } = useAuth(); // <<< שינוי: מספיק לקבל רק את פונקציית ההתנתקות
-  const user = useStore(state => state.user); // <<< שינוי: אנחנו צריכים רק את המשתמש מה-store
+  const { user } = useStore();
 
-  // <<< שינוי: ניהול מצב האירועים הופך למקומי בקומפוננטה
   const [events, setEvents] = useState<ShishiEvent[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      toast.success('התנתקת בהצלחה');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      toast.error('שגיאה בעת ההתנתקות');
+    }
+  };
 
   const fetchEvents = useCallback(async () => {
     if (user) {
       setIsLoadingEvents(true);
       try {
         const fetchedEvents = await FirebaseService.getEventsByOrganizer(user.id);
-        setEvents(fetchedEvents); // <<< שינוי: מעדכנים את המצב המקומי
+        setEvents(fetchedEvents);
       } catch (error) {
         console.error("Failed to fetch events:", error);
         toast.error("שגיאה בטעינת האירועים.");
@@ -158,7 +167,7 @@ const DashboardPage: React.FC = () => {
         setIsLoadingEvents(false);
       }
     }
-  }, [user]); // <<< שינוי: תלות ב-user בלבד
+  }, [user]);
 
   useEffect(() => {
     fetchEvents();
@@ -178,7 +187,13 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  // if (isAuthLoading) ... אין צורך בבדיקה זו יותר, App.tsx מטפל בה.
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-50">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -197,7 +212,7 @@ const DashboardPage: React.FC = () => {
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center mb-6 px-4 sm:px-0">
-            <h2 className="text-xl font-semibold text-gray-700">האירועים שלי ({events.length})</h2> {/* <<< שינוי: שימוש ב-events המקומי */}
+            <h2 className="text-xl font-semibold text-gray-700">האירועים שלי ({events.length})</h2>
             <button onClick={() => setShowCreateModal(true)} className="flex items-center bg-orange-500 text-white px-4 py-2 rounded-lg shadow hover:bg-orange-600 transition-colors">
                 <Plus size={20} className="ml-2" />
                 צור אירוע חדש
@@ -206,9 +221,9 @@ const DashboardPage: React.FC = () => {
 
         {isLoadingEvents ? (
              <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div></div>
-        ) : events.length > 0 ? ( // <<< שינוי: שימוש ב-events המקומי
+        ) : events.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {events.map(event => ( // <<< שינוי: שימוש ב-events המקומי
+                {events.map(event => (
                     <EventCard key={event.id} event={event} onDelete={handleDeleteEvent} />
                 ))}
             </div>
