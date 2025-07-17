@@ -155,6 +155,10 @@ const EventFormModal: React.FC<{ onClose: () => void, onEventCreated: () => void
 // --- רכיב הדאשבורד הראשי ---
 const DashboardPage: React.FC = () => {
   const { user } = useStore();
+  
+  // לוג מיידי כשהקומפוננטה נטענת
+  console.log('🎯 DashboardPage LOADED - User:', user);
+  
   const [currentView, setCurrentView] = useState<'regular' | 'admin'>('regular');
   const [adminView, setAdminView] = useState<'events' | 'users' | 'settings'>('events');
   const [events, setEvents] = useState<ShishiEvent[]>([]);
@@ -162,37 +166,37 @@ const DashboardPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<ShishiEvent | null>(null);
 
-  console.log('🎯 DashboardPage render - User:', user);
+  console.log('🎯 DashboardPage RENDER - User exists:', !!user, 'User ID:', user?.id);
 
   const logout = async () => {
-    console.log('🚪 Logging out user');
+    console.log('🚪 LOGOUT CLICKED');
     try {
       await signOut(auth);
       toast.success('התנתקת בהצלחה');
     } catch (error) {
-      console.error('❌ Error signing out:', error);
+      console.error('❌ LOGOUT ERROR:', error);
       toast.error('שגיאה בעת ההתנתקות');
     }
   };
 
   const fetchEvents = useCallback(async () => {
-    console.log('🔄 DashboardPage.fetchEvents - START');
-    console.log('👤 Current user ID:', user?.id);
+    console.log('🔄 FETCH EVENTS CALLED - User ID:', user?.id);
     
     if (!user) {
-      console.log('❌ No user found');
+      console.log('❌ NO USER - STOPPING FETCH');
       return;
     }
 
+    console.log('📞 ABOUT TO CALL FirebaseService.getEventsByOrganizer');
     setIsLoadingEvents(true);
     
     try {
-      console.log('📞 Calling FirebaseService.getEventsByOrganizer with ID:', user.id);
+      console.log('📞 CALLING getEventsByOrganizer with ID:', user.id);
       const fetchedEvents = await FirebaseService.getEventsByOrganizer(user.id);
-      console.log('✅ Events fetched - count:', fetchedEvents.length);
+      console.log('✅ EVENTS RECEIVED - count:', fetchedEvents.length);
       setEvents(fetchedEvents);
     } catch (error) {
-      console.error("❌ Failed to fetch events:", error);
+      console.error("❌ FETCH EVENTS ERROR:", error);
       toast.error("שגיאה בטעינת האירועים.");
     } finally {
       setIsLoadingEvents(false);
@@ -200,26 +204,26 @@ const DashboardPage: React.FC = () => {
   }, [user]);
 
   useEffect(() => {
-    console.log('🎬 DashboardPage useEffect triggered');
+    console.log('🎬 useEffect TRIGGERED - calling fetchEvents');
     fetchEvents();
   }, [fetchEvents]);
 
   const handleDeleteEvent = async (eventId: string, title: string) => {
-    console.log('🗑️ Attempting to delete event:', { eventId, title });
+    console.log('🗑️ DELETE EVENT CLICKED:', { eventId, title });
     if (!user) {
-      console.error('❌ No user for delete operation');
+      console.error('❌ NO USER FOR DELETE');
       return;
     }
     
     if (window.confirm(`האם אתה בטוח שברצונך למחוק את האירוע "${title}"? הפעולה אינה הפיכה.`)) {
         try {
-            console.log('📞 Calling FirebaseService.deleteEvent...');
+            console.log('📞 CALLING deleteEvent...');
             await FirebaseService.deleteEvent(eventId);
-            console.log('✅ Event deleted successfully');
+            console.log('✅ DELETE SUCCESS');
             toast.success("האירוע נמחק בהצלחה");
             fetchEvents(); // רענון הרשימה המקומית
         } catch (error) {
-            console.error('❌ Error deleting event:', error);
+            console.error('❌ DELETE ERROR:', error);
             toast.error("שגיאה במחיקת האירוע");
         }
     }
@@ -239,7 +243,7 @@ const DashboardPage: React.FC = () => {
   };
 
   if (!user) {
-    console.log('⏳ No user, showing loading spinner');
+    console.log('⏳ NO USER - SHOWING SPINNER');
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50">
         <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500"></div>

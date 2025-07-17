@@ -141,37 +141,36 @@ export class FirebaseService {
    * מחזיר את כל האירועים של מארגן ספציפי
    */
   static async getEventsByOrganizer(organizerId: string): Promise<ShishiEvent[]> {
-    console.log('📋 FirebaseService.getEventsByOrganizer - START');
-    console.log('📥 organizerId:', organizerId);
+    console.log('📋 getEventsByOrganizer CALLED with ID:', organizerId);
     
     try {
       const eventsRef = ref(database, 'events');
-      console.log('🔍 Querying events collection with organizerId:', organizerId);
+      console.log('🔍 QUERYING events collection...');
       
       const eventsQuery = query(eventsRef, orderByChild('organizerId'), equalTo(organizerId));
       const snapshot = await get(eventsQuery);
       
-      console.log('📡 Firebase response - exists:', snapshot.exists());
+      console.log('📡 FIREBASE RESPONSE - exists:', snapshot.exists());
       
       if (snapshot.exists()) {
         const eventsData = snapshot.val();
-        console.log('📋 Raw events data:', JSON.stringify(eventsData, null, 2));
+        console.log('📋 RAW EVENTS DATA:', eventsData);
         
         const events = Object.entries(eventsData).map(([id, event]) => ({
           id,
           ...(event as Omit<ShishiEvent, 'id'>)
         }));
         
-        console.log('✅ Processed events count:', events.length);
-        console.log('✅ First event sample:', events[0]);
+        console.log('✅ PROCESSED EVENTS COUNT:', events.length);
+        console.log('✅ FIRST EVENT:', events[0]);
         
         return events;
       }
       
-      console.log('📭 No events found for organizer:', organizerId);
+      console.log('📭 NO EVENTS FOUND');
       return [];
     } catch (error) {
-      console.error('❌ Error in getEventsByOrganizer:', error);
+      console.error('❌ getEventsByOrganizer ERROR:', error);
       throw error;
     }
   }
