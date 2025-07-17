@@ -6,14 +6,14 @@ import { useStore } from '../store/useStore';
 import { FirebaseService } from '../services/firebaseService';
 import { ShishiEvent, EventDetails } from '../types';
 import { toast } from 'react-hot-toast';
-import { Plus, LogOut, Calendar, MapPin, Clock, Share2, Eye, Trash2, ChefHat, Home, User } from 'lucide-react';
+import { Plus, LogOut, Calendar, MapPin, Clock, Share2, Eye, Trash2, ChefHat, Home } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 
-// --- רכיב כרטיס אירוע (ללא שינוי) ---
+// --- רכיב כרטיס אירוע ---
 const EventCard: React.FC<{ event: ShishiEvent, onDelete: (eventId: string, title: string) => void }> = ({ event, onDelete }) => {
   const navigate = useNavigate();
-  const eventUrl = `${window.location.origin}/event/${event.organizerId}/${event.id}`;
+  const eventUrl = `${window.location.origin}/event/${event.id}`;
   const isPast = new Date(event.details.date) < new Date();
 
   const copyToClipboard = () => {
@@ -54,7 +54,7 @@ const EventCard: React.FC<{ event: ShishiEvent, onDelete: (eventId: string, titl
           <Share2 size={16} className="ml-1" /> שתף
         </button>
         <div className="flex items-center space-x-2 rtl:space-x-reverse">
-          <button onClick={() => navigate(`/event/${event.organizerId}/${event.id}`)} className="p-2 text-neutral-500 hover:bg-neutral-200 rounded-full" title="צפה באירוע">
+          <button onClick={() => navigate(`/event/${event.id}`)} className="p-2 text-neutral-500 hover:bg-neutral-200 rounded-full" title="צפה באירוע">
             <Eye size={18} />
           </button>
           <button onClick={() => onDelete(event.id, event.details.title)} className="p-2 text-neutral-500 hover:bg-error/10 hover:text-error rounded-full" title="מחק אירוע">
@@ -66,7 +66,7 @@ const EventCard: React.FC<{ event: ShishiEvent, onDelete: (eventId: string, titl
   );
 };
 
-// --- רכיב טופס יצירת אירוע (ללא שינוי) ---
+// --- רכיב טופס יצירת אירוע ---
 const EventFormModal: React.FC<{ onClose: () => void, onEventCreated: () => void }> = ({ onClose, onEventCreated }) => {
     const user = useStore(state => state.user);
     const [details, setDetails] = useState<EventDetails>({
@@ -81,22 +81,31 @@ const EventFormModal: React.FC<{ onClose: () => void, onEventCreated: () => void
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        console.log('🎯 EventFormModal.handleSubmit - Starting form submission');
+        console.log('👤 Current user:', user);
+        console.log('📋 Form details:', details);
+        
         if (!user) {
+            console.error('❌ No user found');
             toast.error("שגיאה: משתמש לא מחובר.");
             return;
         }
         if (!details.title || !details.date || !details.time || !details.location) {
+            console.error('❌ Missing required fields');
             toast.error("יש למלא את כל שדות החובה.");
             return;
         }
+        
         setIsLoading(true);
         try {
-            await FirebaseService.createEvent(user.id, details);
+            console.log('📞 Calling FirebaseService.createEvent...');
+            const eventId = await FirebaseService.createEvent(user.id, details);
+            console.log('✅ Event created successfully with ID:', eventId);
             toast.success("האירוע נוצר בהצלחה!");
             onEventCreated();
             onClose();
         } catch (error) {
-            console.error("Error creating event:", error);
+            console.error("❌ Error creating event:", error);
             toast.error("שגיאה ביצירת האירוע.");
         } finally {
             setIsLoading(false);
@@ -135,8 +144,7 @@ const EventFormModal: React.FC<{ onClose: () => void, onEventCreated: () => void
     );
 };
 
-
-// --- רכיב הדאשבורד הראשי (לאחר שכתוב) ---
+// --- רכיב הדאשבורד הראשי ---
 const DashboardPage: React.FC = () => {
   const { user } = useStore();
 
@@ -145,59 +153,81 @@ const DashboardPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   const logout = async () => {
+    console.log('🚪 Logging out user');
     try {
       await signOut(auth);
       toast.success('התנתקת בהצלחה');
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('❌ Error signing out:', error);
       toast.error('שגיאה בעת ההתנתקות');
     }
   };
 
   const fetchEvents = useCallback(async () => {
-    if (user) {
-      console.group('🔄 DashboardPage.fetchEvents');
-      console.log('👤 Current user:', user);
-      setIsLoadingEvents(true);
-      try {
-        console.log('📞 Calling FirebaseService.getEventsByOrganizer...');
-        const fetchedEvents = await FirebaseService.getEventsByOrganizer(user.id);
-        console.log('✅ Events fetched successfully:', fetchedEvents);
-        setEvents(fetchedEvents);
-      } catch (error) {
-        console.error("❌ Failed to fetch events:", error);
-        console.error("📊 Error details:", {
-          message: error?.message,
-          code: error?.code,
-          user: user?.id
-        });
-        toast.error("שגיאה בטעינת האירועים.");
-      } finally {
-        setIsLoadingEvents(false);
-        console.groupEnd();
-      }
+    console.group('🔄 DashboardPage.fetchEvents');
+    console.log('👤 Current user:', user);
+    
+    if (!user) {
+      console.log('❌ No user found, skipping fetch');
+      console.groupEnd();
+      return;
+    }
+
+    console.log('🔍 User ID:', user.id);
+    setIsLoadingEvents(true);
+    
+    try {
+      console.log('📞 Calling FirebaseService.getEventsByOrganizer...');
+      const fetchedEvents = await FirebaseService.getEventsByOrganizer(user.id);
+      console.log('✅ Events fetched successfully:', fetchedEvents);
+      console.log('📊 Number of events:', fetchedEvents.length);
+      setEvents(fetchedEvents);
+    } catch (error) {
+      console.error("❌ Failed to fetch events:", error);
+      console.error("📊 Error details:", {
+        message: error?.message,
+        code: error?.code,
+        stack: error?.stack,
+        userId: user?.id
+      });
+      toast.error("שגיאה בטעינת האירועים.");
+    } finally {
+      setIsLoadingEvents(false);
+      console.log('🏁 Fetch events completed');
+      console.groupEnd();
     }
   }, [user]);
 
   useEffect(() => {
+    console.log('🎬 DashboardPage useEffect triggered');
     fetchEvents();
   }, [fetchEvents]);
 
   const handleDeleteEvent = async (eventId: string, title: string) => {
-    if (!user) return;
+    console.log('🗑️ Attempting to delete event:', { eventId, title });
+    if (!user) {
+      console.error('❌ No user for delete operation');
+      return;
+    }
+    
     if (window.confirm(`האם אתה בטוח שברצונך למחוק את האירוע "${title}"? הפעולה אינה הפיכה.`)) {
         try {
-            await FirebaseService.deleteEvent(user.id, eventId);
+            console.log('📞 Calling FirebaseService.deleteEvent...');
+            await FirebaseService.deleteEvent(eventId);
+            console.log('✅ Event deleted successfully');
             toast.success("האירוע נמחק בהצלחה");
             fetchEvents(); // רענון הרשימה המקומית
         } catch (error) {
+            console.error('❌ Error deleting event:', error);
             toast.error("שגיאה במחיקת האירוע");
-            console.error(error);
         }
     }
   };
 
+  console.log('🎨 DashboardPage render - User:', user, 'Events:', events.length, 'Loading:', isLoadingEvents);
+
   if (!user) {
+    console.log('⏳ No user, showing loading spinner');
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50">
         <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500"></div>
@@ -230,7 +260,10 @@ const DashboardPage: React.FC = () => {
         </div>
 
         {isLoadingEvents ? (
-             <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div></div>
+             <div className="flex items-center justify-center h-64">
+               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+               <p className="ml-4 text-gray-600">טוען אירועים...</p>
+             </div>
         ) : events.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {events.map(event => (

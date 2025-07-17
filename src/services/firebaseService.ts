@@ -144,17 +144,17 @@ export class FirebaseService {
     console.group('📋 FirebaseService.getEventsByOrganizer');
     console.log('📥 Input parameters:', { organizerId });
     
-    console.group('📋 FirebaseService.getEventsByOrganizer');
-    console.log('📥 Input parameters:', { organizerId });
-    
     try {
       const eventsRef = ref(database, 'events');
+      console.log('🔍 Creating query for events collection');
+      console.log('🔍 Query path: events');
+      console.log('🔍 Filter: organizerId ==', organizerId);
+      
       const eventsQuery = query(eventsRef, orderByChild('organizerId'), equalTo(organizerId));
       console.log('🔍 Query path:', 'events');
       console.log('🔍 Query filter:', `organizerId == ${organizerId}`);
-      console.log('🔍 Query path:', 'events');
-      console.log('🔍 Query filter:', `organizerId == ${organizerId}`);
       
+      console.log('📡 Executing Firebase query...');
       const snapshot = await get(eventsQuery);
       console.log('📡 Firebase response received');
       console.log('📊 Snapshot exists:', snapshot.exists());
@@ -162,7 +162,7 @@ export class FirebaseService {
       if (snapshot.exists()) {
         const eventsData = snapshot.val();
         console.log('📋 Raw events data:', eventsData);
-        console.log('📋 Raw events data:', eventsData);
+        console.log('📊 Raw data keys:', Object.keys(eventsData));
         
         const events = Object.entries(eventsData).map(([id, event]) => ({
           id,
@@ -171,25 +171,32 @@ export class FirebaseService {
         
         console.log('✅ Processed events:', events);
         console.log('📊 Events count:', events.length);
-        console.groupEnd();
-        console.log('✅ Processed events:', events);
+        
+        // Log each event details
+        events.forEach((event, index) => {
+          console.log(`📋 Event ${index + 1}:`, {
+            id: event.id,
+            title: event.details?.title,
+            organizerId: event.organizerId,
+            organizerName: event.organizerName
+          });
+        });
+        
         console.groupEnd();
         return events;
       }
       
       console.log('📭 No events found for organizer');
       console.groupEnd();
-      console.log('📭 No events found for organizer');
-      console.groupEnd();
       return [];
     } catch (error) {
       console.error('❌ Error in getEventsByOrganizer:', error);
       console.error('📊 Error details:', {
-        message: error.message,
-        code: error.code,
-        stack: error.stack
+        message: error?.message,
+        code: error?.code,
+        stack: error?.stack,
+        organizerId
       });
-      console.groupEnd();
       console.groupEnd();
       throw error;
     }
