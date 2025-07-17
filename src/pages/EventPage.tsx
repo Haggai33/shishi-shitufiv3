@@ -21,7 +21,6 @@ const categoryNames: { [key: string]: string } = {
 };
 
 // --- Component: CategorySelector ---
-// Based on the new design guide
 const CategorySelector: React.FC<{
   menuItems: MenuItemType[];
   assignments: AssignmentType[];
@@ -83,7 +82,6 @@ const CategorySelector: React.FC<{
 };
 
 // --- Component: MenuItemCard ---
-// Updated based on the new design guide
 const MenuItemCard: React.FC<{
     item: MenuItemType;
     assignment: AssignmentType | undefined;
@@ -146,10 +144,14 @@ const MenuItemCard: React.FC<{
 };
 
 // --- Component: AssignmentModal ---
-// Updated based on the new design guide
-const AssignmentModal: React.FC<{ item: MenuItemType; organizerId: string; eventId: string; user: FirebaseUser; onClose: () => void; isEdit?: boolean; existingAssignment?: AssignmentType; }> = 
-({ item, organizerId, eventId, user, onClose, isEdit = false, existingAssignment }) => {
-    // Logic from original component
+const AssignmentModal: React.FC<{ 
+  item: MenuItemType; 
+  eventId: string; 
+  user: FirebaseUser; 
+  onClose: () => void; 
+  isEdit?: boolean; 
+  existingAssignment?: AssignmentType; 
+}> = ({ item, eventId, user, onClose, isEdit = false, existingAssignment }) => {
     const [quantity, setQuantity] = useState(existingAssignment?.quantity || item.quantity);
     const [notes, setNotes] = useState(existingAssignment?.notes || '');
     const [isLoading, setIsLoading] = useState(false);
@@ -157,7 +159,8 @@ const AssignmentModal: React.FC<{ item: MenuItemType; organizerId: string; event
     const [showNameInput, setShowNameInput] = useState(false);
     
     useEffect(() => {
-        const isParticipant = !!useStore.getState().currentEvent?.participants?.[user.uid];
+        const currentEvent = useStore.getState().currentEvent;
+        const isParticipant = !!(currentEvent?.participants && currentEvent.participants[user.uid]);
         if (user.isAnonymous && !isParticipant) {
             setShowNameInput(true);
         }
@@ -168,15 +171,15 @@ const AssignmentModal: React.FC<{ item: MenuItemType; organizerId: string; event
         if (quantity <= 0) { toast.error("הכמות חייבת להיות גדולה מ-0."); return; }
         setIsLoading(true);
         try {
-            let finalUserName = participantName.trim() || useStore.getState().currentEvent?.participants[user.uid]?.name || 'אורח';
+            let finalUserName = participantName.trim() || useStore.getState().currentEvent?.participants?.[user.uid]?.name || 'אורח';
             if (showNameInput && participantName.trim()) {
-                await FirebaseService.joinEvent(organizerId, eventId, user.uid, finalUserName);
+                await FirebaseService.joinEvent(eventId, user.uid, finalUserName);
             }
             if (isEdit && existingAssignment) {
-                await FirebaseService.updateAssignment(organizerId, eventId, existingAssignment.id, { quantity, notes: notes.trim() });
+                await FirebaseService.updateAssignment(eventId, existingAssignment.id, { quantity, notes: notes.trim() });
                 toast.success("השיבוץ עודכן בהצלחה!");
             } else {
-                await FirebaseService.createAssignment(organizerId, eventId, {
+                await FirebaseService.createAssignment(eventId, {
                     menuItemId: item.id, userId: user.uid, userName: finalUserName,
                     quantity, notes: notes.trim(), status: 'confirmed', assignedAt: Date.now(),
                 });
@@ -246,9 +249,7 @@ const AssignmentModal: React.FC<{ item: MenuItemType; organizerId: string; event
     );
 };
 
-// --- Component: UserMenuItemFormModal ---
-// Updated based on the new design guide
-// Import the actual UserMenuItemForm component
+// Import the UserMenuItemForm component
 import { UserMenuItemForm } from '../components/Events/UserMenuItemForm';
 
 // --- Component: LoadingSpinner ---
@@ -279,7 +280,7 @@ const NameModal: React.FC<{ onSave: (name: string) => void, isLoading: boolean }
 
 // --- Main Page Component ---
 const EventPage: React.FC = () => {
-    const { organizerId, eventId } = useParams<{ organizerId: string; eventId: string }>();
+    const { eventId } = useParams<{ eventId: string }>();
     const [localUser, setLocalUser] = useState<FirebaseUser | null>(null);
     const [isJoining, setIsJoining] = useState(false);
     
@@ -301,16 +302,16 @@ const EventPage: React.FC = () => {
             if (user) setLocalUser(user);
             else signInAnonymously(auth).catch(err => console.error("Anonymous sign-in failed:", err));
         });
-        if (!organizerId || !eventId) return;
-        const unsubEvent = FirebaseService.subscribeToEvent(organizerId, eventId, setCurrentEvent);
+        if (!eventId) return;
+        const unsubEvent = FirebaseService.subscribeToEvent(eventId, setCurrentEvent);
         return () => { unsubAuth(); unsubEvent(); clearCurrentEvent(); };
-    }, [organizerId, eventId, setCurrentEvent, clearCurrentEvent]);
+    }, [eventId, setCurrentEvent, clearCurrentEvent]);
 
     const handleJoinEvent = useCallback(async (name: string) => {
-        if (!organizerId || !eventId || !localUser || !name.trim()) return;
+        if (!eventId || !localUser || !name.trim()) return;
         setIsJoining(true);
         try {
-            await FirebaseService.joinEvent(organizerId, eventId, localUser.uid, name.trim());
+            await FirebaseService.joinEvent(eventId, localUser.uid, name.trim());
             toast.success(`ברוך הבא, ${name.trim()}!`);
             setShowNameModal(false);
             if (itemToAssignAfterJoin) {
@@ -318,7 +319,7 @@ const EventPage: React.FC = () => {
                 setItemToAssignAfterJoin(null);
             }
         } catch (error) { toast.error("שגיאה בהצטרפות לאירוע."); } finally { setIsJoining(false); }
-    }, [organizerId, eventId, localUser, itemToAssignAfterJoin]);
+    }, [eventId, localUser, itemToAssignAfterJoin]);
     
     const handleAssignClick = (item: MenuItemType) => {
         if (!localUser) return;
@@ -332,9 +333,9 @@ const EventPage: React.FC = () => {
     };
     
     const handleCancelClick = async (assignment: AssignmentType) => {
-        if (!organizerId || !eventId) return;
+        if (!eventId) return;
         if (window.confirm("האם לבטל את השיבוץ?")) {
-            await FirebaseService.cancelAssignment(organizerId, eventId, assignment.id, assignment.menuItemId);
+            await FirebaseService.cancelAssignment(eventId, assignment.id, assignment.menuItemId);
             toast.success("השיבוץ בוטל");
         }
     };
@@ -406,8 +407,8 @@ const EventPage: React.FC = () => {
             </main>
 
             {showNameModal && (<NameModal isLoading={isJoining} onSave={handleJoinEvent} />)}
-            {localUser && modalState?.type === 'assign' && modalState.item && (<AssignmentModal item={modalState.item} organizerId={organizerId!} eventId={eventId!} user={localUser} onClose={() => setModalState(null)} />)}
-            {localUser && modalState?.type === 'edit' && modalState.item && modalState.assignment && (<AssignmentModal item={modalState.item} organizerId={organizerId!} eventId={eventId!} user={localUser} onClose={() => setModalState(null)} isEdit={true} existingAssignment={modalState.assignment} />)}
+            {localUser && modalState?.type === 'assign' && modalState.item && (<AssignmentModal item={modalState.item} eventId={eventId!} user={localUser} onClose={() => setModalState(null)} />)}
+            {localUser && modalState?.type === 'edit' && modalState.item && modalState.assignment && (<AssignmentModal item={modalState.item} eventId={eventId!} user={localUser} onClose={() => setModalState(null)} isEdit={true} existingAssignment={modalState.assignment} />)}
             {modalState?.type === 'add-user-item' && currentEvent && (
                 <UserMenuItemForm 
                     event={currentEvent} 

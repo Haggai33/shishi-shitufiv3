@@ -34,7 +34,7 @@ function App() {
           element={user ? <DashboardPage /> : <Navigate to="/login" />} 
         />
         
-        <Route path="/event/:organizerId/:eventId" element={<EventPage />} />
+        <Route path="/event/:eventId" element={<EventPage />} />
         
         <Route 
           path="/" 

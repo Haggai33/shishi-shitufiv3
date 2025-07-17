@@ -143,7 +143,6 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
 
       console.log('🍽️ Preparing menu item data...');
       const newItemData: Omit<MenuItem, 'id'> = {
-        eventId: event.id,
         name: formData.name.trim(),
         category: formData.category,
         quantity: formData.quantity,
@@ -154,13 +153,12 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
         creatorName: finalUserName
       };
       console.log('📋 New item data:', newItemData);
-      console.log('🔗 Firebase path for item:', `organizerEvents/${event.organizerId}/events/${event.id}/menuItems`);
+      console.log('🔗 Firebase path for item:', `events/${event.id}/menuItems`);
 
       if (formData.assignToSelf) {
         console.log('🎯 Adding item with self-assignment...');
         // הוספת פריט עם שיבוץ אוטומטי
         const itemId = await FirebaseService.addMenuItemAndAssign(
-          event.organizerId,
           event.id,
           newItemData,
           authUser.uid,
@@ -179,7 +177,7 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
       } else {
         console.log('📝 Adding item without assignment...');
         // הוספת פריט בלבד
-        const itemId = await FirebaseService.addMenuItem(event.organizerId, event.id, newItemData);
+        const itemId = await FirebaseService.addMenuItem(event.id, newItemData);
         
         if (itemId) {
           console.log('✅ Item added successfully, ID:', itemId);
