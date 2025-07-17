@@ -224,11 +224,11 @@ const DashboardPage: React.FC = () => {
   };
 
   const handleImportItems = (event: ShishiEvent) => {
-    toast.info(`ייבוא פריטים עבור ${event.details.title} - בקרוב!`);
+    toast(`ייבוא פריטים עבור ${event.details.title} - בקרוב!`);
   };
 
   const handleManageParticipants = (event: ShishiEvent) => {
-    toast.info(`ניהול משתתפים עבור ${event.details.title} - בקרוב!`);
+    toast(`ניהול משתתפים עבור ${event.details.title} - בקרוב!`);
   };
 
   const handleEditEvent = (event: ShishiEvent) => {
