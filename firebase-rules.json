@@ -1,47 +1,59 @@
 {
   "rules": {
+    // פרטי המארגנים - רק המארגן יכול לקרוא ולשנות את פרטיו
     "users": {
-      "$userId": {
-        ".read": "auth != null && auth.uid === $userId",
-        ".write": "auth != null && auth.uid === $userId"
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
       }
     },
-    "events": {
-      ".read": "auth != null",
-      "$eventId": {
-        // --- חוקים על שדות בתוך האירוע ---
 
-        // רק המארגן יכול לכתוב לפרטי האירוע ולתפריט
+    // אוסף האירועים הגלובלי
+    "events": {
+      // הרשאה ליצור אירועים חדשים
+      ".write": "auth != null",
+      
+      "$eventId": {
+        // --- הרשאות קריאה ---
+        // כל משתמש מאומת (גם אנונימי) יכול לקרוא את נתוני האירוע
+        ".read": "auth != null",
+
+        // --- הרשאות כתיבה ---
+        // עדכון ומחיקה כלליים של האירוע: רק המארגן הבעלים
+        ".write": "auth != null && (
+          !data.exists() || 
+          data.child('organizerId').val() === auth.uid || 
+          newData.child('organizerId').val() === auth.uid
+        )",
+
+        // הרשאות כתיבה מפורטות לתתי-אוספים
         "details": {
-          ".write": "auth != null && root.child('events').child($eventId).child('organizerId').val() === auth.uid"
+          ".write": "auth != null && (
+            !data.exists() || 
+            root.child('events').child($eventId).child('organizerId').val() === auth.uid
+          )"
         },
         "menuItems": {
-          ".write": "auth != null && root.child('events').child($eventId).child('organizerId').val() === auth.uid"
+          ".write": "auth != null && (
+            !data.exists() || 
+            root.child('events').child($eventId).child('organizerId').val() === auth.uid
+          )"
         },
-        
-        // חוקים שמאפשרים גם למשתתפים לכתוב
         "participants": {
           "$participantId": {
-            // משתתף יכול להוסיף/להסיר רק את עצמו
-            ".write": "auth != null && auth.uid === $participantId"
+            // כל משתמש מאומת יכול להוסיף או להסיר את עצמו בלבד
+            ".write": "auth != null && $participantId === auth.uid"
           }
         },
         "assignments": {
           "$assignmentId": {
-            // משתתף יכול ליצור/למחוק שיבוץ של עצמו, והמארגן יכול למחוק כל שיבוץ
-            ".write": "auth != null && ((newData.exists() && newData.child('userId').val() === auth.uid) || (data.exists() && data.child('userId').val() === auth.uid) || (data.exists() && !newData.exists() && root.child('events').child($eventId).child('organizerId').val() === auth.uid))"
+            // מאפשר למשתתף ליצור/למחוק שיבוץ של עצמו, ולמארגן למחוק כל שיבוץ באירוע
+            ".write": "auth != null && (
+              (newData.exists() && newData.child('userId').val() === auth.uid) || 
+              (data.exists() && data.child('userId').val() === auth.uid) || 
+              (data.exists() && !newData.exists() && root.child('events').child($eventId).child('organizerId').val() === auth.uid)
+            )"
           }
-        },
-
-        // --- חוקים על שדות השורש של האירוע ---
-
-        // ניתן לכתוב את ה-organizerId רק בעת יצירת האירוע
-        "organizerId": {
-          ".write": "!data.exists() && newData.val() === auth.uid"
-        },
-        // מונע ממשתתפים לדרוס שדות אחרים שלא הוגדרו להם הרשאות
-        "$other": {
-          ".write": "false"
         }
       }
     }
