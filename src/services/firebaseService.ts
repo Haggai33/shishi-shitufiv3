@@ -26,6 +26,10 @@ export class FirebaseService {
    * מוודא שלאירוע יש את כל המבנים הנדרשים
    */
   private static async ensureEventStructure(organizerId: string, eventId: string): Promise<void> {
+    console.group('🔧 FirebaseService.ensureEventStructure');
+    console.log('📥 Input parameters:', { organizerId, eventId });
+    
+    try {
     const eventRef = ref(database, this.eventPath(organizerId, eventId));
     const snapshot = await get(eventRef);
     
@@ -127,6 +131,7 @@ export class FirebaseService {
     callback: (eventData: ShishiEvent | null) => void
   ): () => void {
     const eventRef = ref(database, this.eventPath(organizerId, eventId));
+      console.log('📖 Reading event data...');
     
     const onValueChange = async (snapshot: any) => {
       if (snapshot.exists()) {
@@ -134,6 +139,7 @@ export class FirebaseService {
         await this.ensureEventStructure(organizerId, eventId);
         
         const eventData = snapshot.val();
+        console.log('📋 Current event data:', eventData);
         callback({
           id: eventId,
           ...eventData
@@ -443,9 +449,18 @@ export class FirebaseService {
       if (!eventData.organizerName) issues.push('חסר שם מארגן');
       
       // בדיקת עקביות שיבוצים
-      if (eventData.menuItems && eventData.assignments) {
-        const menuItems = eventData.menuItems;
-        const assignments = eventData.assignments;
+        if (!eventData.menuItems) {
+          console.log('➕ Adding missing menuItems structure');
+          updates[`${this.eventPath(organizerId, eventId)}/menuItems`] = {};
+        }
+        if (!eventData.assignments) {
+          console.log('➕ Adding missing assignments structure');
+          updates[`${this.eventPath(organizerId, eventId)}/assignments`] = {};
+        }
+        if (!eventData.participants) {
+          console.log('➕ Adding missing participants structure');
+          updates[`${this.eventPath(organizerId, eventId)}/participants`] = {};
+        }
         
         console.log('📋 Assignment data:', assignmentData);
         Object.entries(assignments).forEach(([assignmentId, assignment]: [string, any]) => {
@@ -454,9 +469,22 @@ export class FirebaseService {
             issues.push(`שיבוץ ${assignmentId} מצביע על פריט שלא קיים`);
           } else if (menuItem.assignedTo !== assignment.userId) {
             issues.push(`אי-עקביות בשיבוץ ${assignmentId}`);
+          console.log('💾 Applying structure updates:', updates);
           }
+          console.log('✅ Structure updates applied');
+        } else {
+          console.log('✅ Event structure is already complete');
         });
+      } else {
+        console.warn('⚠️ Event does not exist:', this.eventPath(organizerId, eventId));
       }
+      
+      console.groupEnd();
+    } catch (error) {
+      console.error('❌ Error in ensureEventStructure:', error);
+      console.groupEnd();
+      throw error;
+    }
       
       return { isValid: issues.length === 0, issues };
       console.log('💾 Updates to apply:', updates);
