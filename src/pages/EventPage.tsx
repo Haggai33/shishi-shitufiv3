@@ -11,6 +11,15 @@ import { ShishiEvent, MenuItem as MenuItemType, Assignment as AssignmentType, Pa
 import { Calendar, Clock, MapPin, ChefHat, User as UserIcon, AlertCircle, Edit, X, Search, ArrowRight, Plus, Trash2, MessageSquare, Hash } from 'lucide-react';
 import { isEventPast } from '../utils/dateUtils';
 
+// Category names mapping
+const categoryNames: { [key: string]: string } = {
+    starter: 'מנה ראשונה',
+    main: 'מנה עיקרית', 
+    dessert: 'קינוחים',
+    drink: 'משקאות',
+    other: 'אחר'
+};
+
 // --- Component: CategorySelector ---
 // Based on the new design guide
 const CategorySelector: React.FC<{
@@ -129,7 +138,6 @@ const MenuItemCard: React.FC<{
     isMyAssignment: boolean;
     isEventActive: boolean;
 }> = ({ item, assignment, onAssign, onEdit, onCancel, isMyAssignment, isEventActive }) => {
-    const categoryNames: { [key: string]: string } = { starter: 'מנה ראשונה', main: 'מנה עיקרית', dessert: 'קינוחים', drink: 'משקאות', other: 'אחר' };
     const assignedByOther = assignment && !isMyAssignment;
 
     const cardStyles = isMyAssignment
