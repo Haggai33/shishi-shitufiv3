@@ -411,7 +411,6 @@ export function UserMenuItemForm({ event, onClose, availableCategories }: UserMe
               ביטול
             </button>
           </div>
-        </div>
         </form>
       </div>
     </div>
