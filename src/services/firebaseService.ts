@@ -28,23 +28,46 @@ export class FirebaseService {
   private static async ensureEventStructure(organizerId: string, eventId: string): Promise<void> {
     console.group('🔧 FirebaseService.ensureEventStructure');
     console.log('📥 Input parameters:', { organizerId, eventId });
+    console.log('🔗 Event path:', this.eventPath(organizerId, eventId));
     
     try {
-    const eventRef = ref(database, this.eventPath(organizerId, eventId));
-    const snapshot = await get(eventRef);
-    
-    if (snapshot.exists()) {
-      const eventData = snapshot.val();
-      const updates: { [key: string]: any } = {};
+      const eventRef = ref(database, this.eventPath(organizerId, eventId));
+      const snapshot = await get(eventRef);
       
-      // וידוא שכל המבנים הנדרשים קיימים
-      if (!eventData.menuItems) updates[`${this.eventPath(organizerId, eventId)}/menuItems`] = {};
-      if (!eventData.assignments) updates[`${this.eventPath(organizerId, eventId)}/assignments`] = {};
-      if (!eventData.participants) updates[`${this.eventPath(organizerId, eventId)}/participants`] = {};
-      
-      if (Object.keys(updates).length > 0) {
-        await update(ref(database), updates);
+      if (snapshot.exists()) {
+        const eventData = snapshot.val();
+        const updates: { [key: string]: any } = {};
+        
+        // וידוא שכל המבנים הנדרשים קיימים
+        if (!eventData.menuItems) {
+          console.log('➕ Adding missing menuItems structure');
+          updates[`${this.eventPath(organizerId, eventId)}/menuItems`] = {};
+        }
+        if (!eventData.assignments) {
+          console.log('➕ Adding missing assignments structure');
+          updates[`${this.eventPath(organizerId, eventId)}/assignments`] = {};
+        }
+        if (!eventData.participants) {
+          console.log('➕ Adding missing participants structure');
+          updates[`${this.eventPath(organizerId, eventId)}/participants`] = {};
+        }
+        
+        if (Object.keys(updates).length > 0) {
+          console.log('💾 Applying structure updates:', updates);
+          await update(ref(database), updates);
+          console.log('✅ Structure updates applied');
+        } else {
+          console.log('✅ Event structure is already complete');
+        }
+      } else {
+        console.warn('⚠️ Event does not exist:', this.eventPath(organizerId, eventId));
       }
+      
+      console.groupEnd();
+    } catch (error) {
+      console.error('❌ Error in ensureEventStructure:', error);
+      console.groupEnd();
+      throw error;
     }
   }
 
@@ -131,7 +154,7 @@ export class FirebaseService {
     callback: (eventData: ShishiEvent | null) => void
   ): () => void {
     const eventRef = ref(database, this.eventPath(organizerId, eventId));
-      console.log('📖 Reading event data...');
+    console.log('📖 Reading event data...');
     
     const onValueChange = async (snapshot: any) => {
       if (snapshot.exists()) {
@@ -190,21 +213,32 @@ export class FirebaseService {
     
     try {
       console.log('🔧 Ensuring event structure...');
-    await this.ensureEventStructure(organizerId, eventId);
-    
-    const newItemRef = push(ref(database, `${this.eventPath(organizerId, eventId)}/menuItems`));
-    const newItemId = newItemRef.key!;
-    
-    const finalItemData = {
-      ...itemData,
-      id: newItemId
-    };
-    
-    console.log('Final item data:', finalItemData);
-    
-    await set(newItemRef, finalItemData);
-    console.log('Menu item added successfully with ID:', newItemId);
-    return newItemId;
+      await this.ensureEventStructure(organizerId, eventId);
+      console.log('✅ Event structure ensured');
+      
+      console.log('📝 Creating new item reference...');
+      const newItemRef = push(ref(database, `${this.eventPath(organizerId, eventId)}/menuItems`));
+      const newItemId = newItemRef.key!;
+      console.log('🆔 Generated item ID:', newItemId);
+      
+      const finalItemData = {
+        ...itemData,
+        id: newItemId
+      };
+      
+      console.log('📋 Final item data to save:', finalItemData);
+      console.log('💾 Saving to Firebase...');
+      
+      await set(newItemRef, finalItemData);
+      console.log('✅ Menu item saved successfully!');
+      console.groupEnd();
+      
+      return newItemId;
+    } catch (error) {
+      console.error('❌ Error in addMenuItem:', error);
+      console.groupEnd();
+      throw error;
+    }
   }
 
   /**
@@ -217,51 +251,66 @@ export class FirebaseService {
     assignToUserId: string | null,
     assignToUserName: string
   ): Promise<string> {
-    console.log('Adding menu item and assign:', { organizerId, eventId, itemData, assignToUserId, assignToUserName });
+    console.group('🍽️➕👤 FirebaseService.addMenuItemAndAssign');
+    console.log('📥 Input parameters:', { organizerId, eventId, itemData, assignToUserId, assignToUserName });
+    console.log('🔗 Event path:', this.eventPath(organizerId, eventId));
     
-    await this.ensureEventStructure(organizerId, eventId);
-    
-    const newItemRef = push(ref(database, `${this.eventPath(organizerId, eventId)}/menuItems`));
-    const newItemId = newItemRef.key!;
-    
-    const updates: { [key: string]: any } = {};
-    
-    // הוספת הפריט
-    const finalItemData: any = {
-      ...itemData,
-      id: newItemId
-    };
-
-    // אם יש שיבוץ, הוסף את פרטי השיבוץ לפריט
-    if (assignToUserId) {
-      finalItemData.assignedTo = assignToUserId;
-      finalItemData.assignedToName = assignToUserName;
-      finalItemData.assignedAt = Date.now();
-
-      // יצירת שיבוץ נפרד
-      const newAssignmentRef = push(ref(database, `${this.eventPath(organizerId, eventId)}/assignments`));
-      const assignmentData: Omit<Assignment, 'id'> = {
+    try {
+      console.log('🔧 Ensuring event structure...');
+      await this.ensureEventStructure(organizerId, eventId);
       console.log('✅ Event structure ensured');
-        menuItemId: newItemId,
-      console.log('📝 Creating new item reference...');
-        userId: assignToUserId,
-        userName: assignToUserName,
-      console.log('🆔 Generated item ID:', newItemId);
-        quantity: itemData.quantity,
-        notes: '',
-        status: 'confirmed',
-        assignedAt: Date.now()
-      };
       
-      updates[`${this.eventPath(organizerId, eventId)}/assignments/${newAssignmentRef.key}`] = assignmentData;
+      console.log('📝 Creating new item reference...');
+      const newItemRef = push(ref(database, `${this.eventPath(organizerId, eventId)}/menuItems`));
+      const newItemId = newItemRef.key!;
+      console.log('🆔 Generated item ID:', newItemId);
+      
+      const updates: { [key: string]: any } = {};
+      
+      // הוספת הפריט
+      const finalItemData: any = {
+        ...itemData,
+        id: newItemId
+      };
+
+      // אם יש שיבוץ, הוסף את פרטי השיבוץ לפריט
+      if (assignToUserId) {
+        console.log('👤 Adding assignment data to item...');
+        finalItemData.assignedTo = assignToUserId;
+        finalItemData.assignedToName = assignToUserName;
+        finalItemData.assignedAt = Date.now();
+
+        // יצירת שיבוץ נפרד
+        console.log('📋 Creating separate assignment...');
+        const newAssignmentRef = push(ref(database, `${this.eventPath(organizerId, eventId)}/assignments`));
+        const assignmentData: Omit<Assignment, 'id'> = {
+          menuItemId: newItemId,
+          userId: assignToUserId,
+          userName: assignToUserName,
+          quantity: itemData.quantity,
+          notes: '',
+          status: 'confirmed',
+          assignedAt: Date.now()
+        };
+        
+        console.log('📋 Assignment data:', assignmentData);
+        updates[`${this.eventPath(organizerId, eventId)}/assignments/${newAssignmentRef.key}`] = assignmentData;
+      }
+      
+      updates[`${this.eventPath(organizerId, eventId)}/menuItems/${newItemId}`] = finalItemData;
+      
+      console.log('💾 Updates to apply:', updates);
+      console.log('🚀 Applying updates to Firebase...');
+      await update(ref(database), updates);
+      console.log('✅ Menu item and assignment saved successfully!');
+      console.groupEnd();
+      
+      return newItemId;
+    } catch (error) {
+      console.error('❌ Error in addMenuItemAndAssign:', error);
+      console.groupEnd();
+      throw error;
     }
-    
-    updates[`${this.eventPath(organizerId, eventId)}/menuItems/${newItemId}`] = finalItemData;
-    
-    console.log('Updates to apply:', updates);
-    await update(ref(database), updates);
-    console.log('Menu item and assignment added successfully with ID:', newItemId);
-    return newItemId;
   }
 
   /**
@@ -313,30 +362,39 @@ export class FirebaseService {
     userId: string,
     userName: string
   ): Promise<void> {
-    await this.ensureEventStructure(organizerId, eventId);
+    console.group('👥 FirebaseService.joinEvent');
+    console.log('📥 Input parameters:', { organizerId, eventId, userId, userName });
     
-    const participantRef = ref(database, `${this.eventPath(organizerId, eventId)}/participants/${userId}`);
-    await set(participantRef, {
-      name: userName,
-      joinedAt: Date.now()
-    });
+    try {
+      await this.ensureEventStructure(organizerId, eventId);
+      
+      const participantRef = ref(database, `${this.eventPath(organizerId, eventId)}/participants/${userId}`);
+      const participantData = {
+        name: userName,
+        joinedAt: Date.now()
+      };
+      
+      console.log('👤 Participant data:', participantData);
+      console.log('💾 Saving participant to Firebase...');
+      
+      await set(participantRef, participantData);
+      console.log('✅ Participant joined successfully!');
+      console.groupEnd();
+    } catch (error) {
+      console.error('❌ Error in joinEvent:', error);
+      console.groupEnd();
+      throw error;
+    }
   }
 
   /**
    * מסיר משתתף מהאירוע
    */
-      console.log('📋 Final item data to save:', finalItemData);
-      console.log('💾 Saving to Firebase...');
+  static async leaveEvent(organizerId: string, eventId: string, userId: string): Promise<void> {
     const participantRef = ref(database, `${this.eventPath(organizerId, eventId)}/participants/${userId}`);
     await remove(participantRef);
-      console.log('✅ Menu item saved successfully!');
-      console.groupEnd();
+  }
 
-    } catch (error) {
-      console.error('❌ Error in addMenuItem:', error);
-      console.groupEnd();
-      throw error;
-    }
   // ===============================
   // ניהול שיבוצים (Assignments)
   // ===============================
@@ -411,19 +469,12 @@ export class FirebaseService {
     
     await update(ref(database), updates);
   }
-    console.group('🍽️➕👤 FirebaseService.addMenuItemAndAssign');
-    console.log('📥 Input parameters:', { organizerId, eventId, itemData, assignToUserId, assignToUserName });
-    console.log('🔗 Event path:', this.eventPath(organizerId, eventId));
+
   // ===============================
-    try {
-      console.log('🔧 Ensuring event structure...');
   // פונקציות תחזוקה ואבחון
-      console.log('✅ Event structure ensured');
   // ===============================
-      console.log('📝 Creating new item reference...');
 
   /**
-      console.log('🆔 Generated item ID:', newItemId);
    * מוודא עקביות נתונים באירוע
    */
   static async validateEventData(organizerId: string, eventId: string): Promise<{
@@ -435,13 +486,11 @@ export class FirebaseService {
     try {
       const eventSnapshot = await get(ref(database, this.eventPath(organizerId, eventId)));
       
-        console.log('👤 Adding assignment data to item...');
       if (!eventSnapshot.exists()) {
         return { isValid: false, issues: ['האירוע לא קיים'] };
       }
       
       const eventData = eventSnapshot.val();
-        console.log('📋 Creating separate assignment...');
       
       // בדיקת מבנה בסיסי
       if (!eventData.details) issues.push('חסרים פרטי האירוע');
@@ -449,54 +498,22 @@ export class FirebaseService {
       if (!eventData.organizerName) issues.push('חסר שם מארגן');
       
       // בדיקת עקביות שיבוצים
-        if (!eventData.menuItems) {
-          console.log('➕ Adding missing menuItems structure');
-          updates[`${this.eventPath(organizerId, eventId)}/menuItems`] = {};
-        }
-        if (!eventData.assignments) {
-          console.log('➕ Adding missing assignments structure');
-          updates[`${this.eventPath(organizerId, eventId)}/assignments`] = {};
-        }
-        if (!eventData.participants) {
-          console.log('➕ Adding missing participants structure');
-          updates[`${this.eventPath(organizerId, eventId)}/participants`] = {};
-        }
-        
-        console.log('📋 Assignment data:', assignmentData);
-        Object.entries(assignments).forEach(([assignmentId, assignment]: [string, any]) => {
-          const menuItem = menuItems[assignment.menuItemId];
-          if (!menuItem) {
-            issues.push(`שיבוץ ${assignmentId} מצביע על פריט שלא קיים`);
-          } else if (menuItem.assignedTo !== assignment.userId) {
-            issues.push(`אי-עקביות בשיבוץ ${assignmentId}`);
-          console.log('💾 Applying structure updates:', updates);
-          }
-          console.log('✅ Structure updates applied');
-        } else {
-          console.log('✅ Event structure is already complete');
-        });
-      } else {
-        console.warn('⚠️ Event does not exist:', this.eventPath(organizerId, eventId));
-      }
+      const menuItems = eventData.menuItems || {};
+      const assignments = eventData.assignments || {};
       
-      console.groupEnd();
-    } catch (error) {
-      console.error('❌ Error in ensureEventStructure:', error);
-      console.groupEnd();
-      throw error;
-    }
+      Object.entries(assignments).forEach(([assignmentId, assignment]: [string, any]) => {
+        const menuItem = menuItems[assignment.menuItemId];
+        if (!menuItem) {
+          issues.push(`שיבוץ ${assignmentId} מצביע על פריט שלא קיים`);
+        } else if (menuItem.assignedTo !== assignment.userId) {
+          issues.push(`אי-עקביות בשיבוץ ${assignmentId}`);
+        }
+      });
       
       return { isValid: issues.length === 0, issues };
-      console.log('💾 Updates to apply:', updates);
-      console.log('🚀 Applying updates to Firebase...');
     } catch (error) {
-      console.log('✅ Menu item and assignment saved successfully!');
-      console.groupEnd();
-    }
-    } catch (error) {
-      console.error('❌ Error in addMenuItemAndAssign:', error);
-      console.groupEnd();
-      throw error;
+      console.error('Error validating event data:', error);
+      return { isValid: false, issues: ['שגיאה בבדיקת הנתונים'] };
     }
   }
 }
