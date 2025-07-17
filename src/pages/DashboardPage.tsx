@@ -11,6 +11,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { AdminHeader } from '../components/Admin/AdminHeader';
 import { AdminEventsPanel } from '../components/Admin/AdminEventsPanel';
+import { ImportItemsModal } from '../components/Admin/ImportItemsModal';
 
 // --- רכיב כרטיס אירוע ---
 const EventCard: React.FC<{ event: ShishiEvent, onDelete: (eventId: string, title: string) => void }> = ({ event, onDelete }) => {
@@ -165,6 +166,8 @@ const DashboardPage: React.FC = () => {
   const [isLoadingEvents, setIsLoadingEvents] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<ShishiEvent | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [selectedEventForImport, setSelectedEventForImport] = useState<ShishiEvent | null>(null);
 
   console.log('🎯 DashboardPage RENDER - User exists:', !!user, 'User ID:', user?.id);
 
@@ -224,7 +227,8 @@ const DashboardPage: React.FC = () => {
   };
 
   const handleImportItems = (event: ShishiEvent) => {
-    toast(`ייבוא פריטים עבור ${event.details.title} - בקרוב!`);
+    setSelectedEventForImport(event);
+    setShowImportModal(true);
   };
 
   const handleManageParticipants = (event: ShishiEvent) => {
@@ -356,6 +360,16 @@ const DashboardPage: React.FC = () => {
           }} 
           onEventCreated={fetchEvents}
           editingEvent={editingEvent || undefined}
+        />
+      )}
+
+      {showImportModal && selectedEventForImport && (
+        <ImportItemsModal
+          event={selectedEventForImport}
+          onClose={() => {
+            setShowImportModal(false);
+            setSelectedEventForImport(null);
+          }}
         />
       )}
     </div>
