@@ -9,6 +9,8 @@ import { toast } from 'react-hot-toast';
 import { Plus, LogOut, Calendar, MapPin, Clock, Share2, Eye, Trash2, ChefHat, Home, Settings, Users } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import { AdminHeader } from '../components/Admin/AdminHeader';
+import { AdminEventsPanel } from '../components/Admin/AdminEventsPanel';
 
 // --- רכיב כרטיס אירוע ---
 const EventCard: React.FC<{ event: ShishiEvent, onDelete: (eventId: string, title: string) => void }> = ({ event, onDelete }) => {
@@ -54,7 +56,7 @@ const EventCard: React.FC<{ event: ShishiEvent, onDelete: (eventId: string, titl
           <Share2 size={16} className="ml-1" /> שתף
         </button>
         <div className="flex items-center space-x-2 rtl:space-x-reverse">
-          <button onClick={() => navigate(`/event/${event.id}`)} className="p-2 text-neutral-500 hover:bg-neutral-200 rounded-full" title="צפה באירוع">
+          <button onClick={() => navigate(`/event/${event.id}`)} className="p-2 text-neutral-500 hover:bg-neutral-200 rounded-full" title="צפה באירוע">
             <Eye size={18} />
           </button>
           <button onClick={() => onDelete(event.id, event.details.title)} className="p-2 text-neutral-500 hover:bg-error/10 hover:text-error rounded-full" title="מחק אירוע">
@@ -67,15 +69,15 @@ const EventCard: React.FC<{ event: ShishiEvent, onDelete: (eventId: string, titl
 };
 
 // --- רכיב טופס יצירת אירוע ---
-const EventFormModal: React.FC<{ onClose: () => void, onEventCreated: () => void }> = ({ onClose, onEventCreated }) => {
+const EventFormModal: React.FC<{ onClose: () => void, onEventCreated: () => void, editingEvent?: ShishiEvent }> = ({ onClose, onEventCreated, editingEvent }) => {
     const user = useStore(state => state.user);
     const [details, setDetails] = useState<EventDetails>({
-        title: '',
-        date: '',
-        time: '19:00',
-        location: '',
-        description: '',
-        isActive: true,
+        title: editingEvent?.details.title || '',
+        date: editingEvent?.details.date || '',
+        time: editingEvent?.details.time || '19:00',
+        location: editingEvent?.details.location || '',
+        description: editingEvent?.details.description || '',
+        isActive: editingEvent?.details.isActive ?? true,
     });
     const [isLoading, setIsLoading] = useState(false);
 
@@ -98,15 +100,21 @@ const EventFormModal: React.FC<{ onClose: () => void, onEventCreated: () => void
         
         setIsLoading(true);
         try {
-            console.log('📞 Calling FirebaseService.createEvent...');
-            const eventId = await FirebaseService.createEvent(user.id, details);
-            console.log('✅ Event created successfully with ID:', eventId);
-            toast.success("האירוע נוצר בהצלחה!");
+            if (editingEvent) {
+                console.log('📝 Updating existing event...');
+                await FirebaseService.updateEventDetails(editingEvent.id, details);
+                toast.success("האירוע עודכן בהצלחה!");
+            } else {
+                console.log('📞 Calling FirebaseService.createEvent...');
+                const eventId = await FirebaseService.createEvent(user.id, details);
+                console.log('✅ Event created successfully with ID:', eventId);
+                toast.success("האירוע נוצר בהצלחה!");
+            }
             onEventCreated();
             onClose();
         } catch (error) {
-            console.error("❌ Error creating event:", error);
-            toast.error("שגיאה ביצירת האירוע.");
+            console.error("❌ Error saving event:", error);
+            toast.error(editingEvent ? "שגיאה בעדכון האירוע." : "שגיאה ביצירת האירוע.");
         } finally {
             setIsLoading(false);
         }
@@ -117,7 +125,7 @@ const EventFormModal: React.FC<{ onClose: () => void, onEventCreated: () => void
             <div className="bg-white rounded-xl shadow-xl max-w-lg w-full">
                 <form onSubmit={handleSubmit}>
                     <div className="p-6">
-                        <h2 className="text-xl font-bold mb-4">יצירת אירוע חדש</h2>
+                        <h2 className="text-xl font-bold mb-4">{editingEvent ? 'עריכת אירוע' : 'יצירת אירוע חדש'}</h2>
                         <div className="space-y-4">
                             <input type="text" placeholder="שם האירוע" value={details.title} onChange={e => setDetails({...details, title: e.target.value})} className="w-full p-2 border rounded-lg" required />
                             <div className="flex space-x-4">
@@ -135,7 +143,7 @@ const EventFormModal: React.FC<{ onClose: () => void, onEventCreated: () => void
                     <div className="bg-gray-50 px-6 py-4 flex justify-end space-x-3 rounded-b-xl">
                         <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300">ביטול</button>
                         <button type="submit" disabled={isLoading} className="px-4 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:bg-orange-300">
-                            {isLoading ? 'יוצר...' : 'צור אירוע'}
+                            {isLoading ? (editingEvent ? 'מעדכן...' : 'יוצר...') : (editingEvent ? 'עדכן אירוע' : 'צור אירוע')}
                         </button>
                     </div>
                 </form>
@@ -147,10 +155,12 @@ const EventFormModal: React.FC<{ onClose: () => void, onEventCreated: () => void
 // --- רכיב הדאשבורד הראשי ---
 const DashboardPage: React.FC = () => {
   const { user } = useStore();
-  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [currentView, setCurrentView] = useState<'regular' | 'admin'>('regular');
+  const [adminView, setAdminView] = useState<'events' | 'users' | 'settings'>('events');
   const [events, setEvents] = useState<ShishiEvent[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<ShishiEvent | null>(null);
 
   console.log('🎯 DashboardPage render - User:', user);
 
@@ -218,6 +228,19 @@ const DashboardPage: React.FC = () => {
     }
   };
 
+  const handleImportItems = (event: ShishiEvent) => {
+    toast.info(`ייבוא פריטים עבור ${event.details.title} - בקרוב!`);
+  };
+
+  const handleManageParticipants = (event: ShishiEvent) => {
+    toast.info(`ניהול משתתפים עבור ${event.details.title} - בקרוב!`);
+  };
+
+  const handleEditEvent = (event: ShishiEvent) => {
+    setEditingEvent(event);
+    setShowCreateModal(true);
+  };
+
   if (!user) {
     console.log('⏳ No user, showing loading spinner');
     return (
@@ -229,83 +252,80 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header with Admin Panel Toggle */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <div className="flex items-center">
-            <ChefHat className="h-8 w-8 text-orange-500" />
-            <h1 className="ml-3 text-2xl font-bold text-gray-900">הדאשבורד של {user?.name}</h1>
-          </div>
+      {currentView === 'admin' ? (
+        // Admin Panel View
+        <div className="min-h-screen bg-gray-50">
+          <AdminHeader
+            userName={user.name}
+            onLogout={logout}
+            currentView={adminView}
+            onViewChange={setAdminView}
+          />
           
-          <div className="flex items-center space-x-4 rtl:space-x-reverse">
-            {/* Admin Panel Toggle */}
-            <button
-              onClick={() => setShowAdminPanel(!showAdminPanel)}
-              className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                showAdminPanel 
-                  ? 'bg-blue-100 text-blue-700' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              <Settings className="h-4 w-4 ml-1" />
-              {showAdminPanel ? 'חזור לאירועים' : 'פאנל ניהול'}
-            </button>
+          <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            {adminView === 'events' && (
+              <AdminEventsPanel
+                events={events}
+                onCreateEvent={() => {
+                  setEditingEvent(null);
+                  setShowCreateModal(true);
+                }}
+                onEditEvent={handleEditEvent}
+                onDeleteEvent={handleDeleteEvent}
+                onImportItems={handleImportItems}
+                onManageParticipants={handleManageParticipants}
+              />
+            )}
             
-            <button onClick={logout} className="text-sm font-medium text-gray-600 hover:text-red-500 flex items-center">
-              <LogOut size={16} className="ml-1" />
-              התנתק
-            </button>
-          </div>
+            {adminView === 'users' && (
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-2xl font-bold mb-4">ניהול משתמשים</h2>
+                <p className="text-gray-600">פונקציונליות ניהול משתמשים תתווסף בקרוב...</p>
+              </div>
+            )}
+            
+            {adminView === 'settings' && (
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-2xl font-bold mb-4">הגדרות מערכת</h2>
+                <p className="text-gray-600">הגדרות מערכת יתווספו בקרוב...</p>
+              </div>
+            )}
+          </main>
         </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {showAdminPanel ? (
-          // Admin Panel Content
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-bold mb-6">פאנל ניהול</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {events.map(event => (
-                <div key={event.id} className="bg-gray-50 rounded-lg p-4">
-                  <h3 className="font-bold text-lg mb-2">{event.details.title}</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    {new Date(event.details.date).toLocaleDateString('he-IL')} • {event.details.time}
-                  </p>
-                  
-                  <div className="space-y-2">
-                    <button 
-                      onClick={() => {
-                        // כאן נוסיף את פונקציית הייבוא
-                        toast.info('פונקציית ייבוא תתווסף בקרוב');
-                      }}
-                      className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center"
-                    >
-                      <Plus className="h-4 w-4 ml-1" />
-                      ייבא פריטים
-                    </button>
-                    
-                    <button 
-                      onClick={() => {
-                        // כאן נוסיף את ניהול המשתתפים
-                        toast.info('ניהול משתתפים יתווסף בקרוב');
-                      }}
-                      className="w-full bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center"
-                    >
-                      <Users className="h-4 w-4 ml-1" />
-                      נהל משתתפים
-                    </button>
-                  </div>
-                </div>
-              ))}
+      ) : (
+        // Regular Dashboard View
+        <>
+          <header className="bg-white shadow-sm">
+            <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+              <div className="flex items-center">
+                <ChefHat className="h-8 w-8 text-orange-500" />
+                <h1 className="ml-3 text-2xl font-bold text-gray-900">הדאשבורד של {user?.name}</h1>
+              </div>
+              
+              <div className="flex items-center space-x-4 rtl:space-x-reverse">
+                <button
+                  onClick={() => setCurrentView('admin')}
+                  className="flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+                >
+                  <Settings className="h-4 w-4 ml-1" />
+                  פאנל ניהול
+                </button>
+                
+                <button onClick={logout} className="text-sm font-medium text-gray-600 hover:text-red-500 flex items-center">
+                  <LogOut size={16} className="ml-1" />
+                  התנתק
+                </button>
+              </div>
             </div>
-          </div>
-        ) : (
-          // Regular Events View
-          <>
+          </header>
+
+          <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center mb-6 px-4 sm:px-0">
                 <h2 className="text-xl font-semibold text-gray-700">האירועים שלי ({events.length})</h2>
-                <button onClick={() => setShowCreateModal(true)} className="flex items-center bg-orange-500 text-white px-4 py-2 rounded-lg shadow hover:bg-orange-600 transition-colors">
+                <button onClick={() => {
+                  setEditingEvent(null);
+                  setShowCreateModal(true);
+                }} className="flex items-center bg-orange-500 text-white px-4 py-2 rounded-lg shadow hover:bg-orange-600 transition-colors">
                     <Plus size={20} className="ml-2" />
                     צור אירוע חדש
                 </button>
@@ -329,11 +349,20 @@ const DashboardPage: React.FC = () => {
                     <p className="mt-1 text-sm text-gray-500">לחץ על "צור אירוע חדש" כדי להתחיל.</p>
                 </div>
             )}
-          </>
-        )}
-      </main>
+          </main>
+        </>
+      )}
 
-      {showCreateModal && <EventFormModal onClose={() => setShowCreateModal(false)} onEventCreated={fetchEvents} />}
+      {showCreateModal && (
+        <EventFormModal 
+          onClose={() => {
+            setShowCreateModal(false);
+            setEditingEvent(null);
+          }} 
+          onEventCreated={fetchEvents}
+          editingEvent={editingEvent || undefined}
+        />
+      )}
     </div>
   );
 };
